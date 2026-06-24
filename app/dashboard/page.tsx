@@ -30,6 +30,7 @@ export default function Dashboard() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/auth'); return }
       setUserName(user.user_metadata?.full_name?.split(' ')[0] || 'there')
+      supabase.rpc('touch_last_active')   // record activity (fire-and-forget)
       const { data } = await supabase.from('question_banks')
         .select('*').order('created_at', { ascending: false })
       setBanks(data || [])

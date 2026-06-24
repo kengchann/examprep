@@ -22,7 +22,30 @@ export type QuestionBank = {
   description: string
   category: string
   question_count: number
+  is_open: boolean          // open to all students (no per-student assignment needed)
   created_by: string
+  created_at: string
+}
+
+export type Profile = {
+  id: string
+  email: string
+  full_name: string | null
+  role: 'admin' | 'student'
+  last_active: string | null
+  created_at: string
+}
+
+export type Attempt = {
+  id: string
+  user_id: string
+  bank_id: string | null
+  bank_name: string
+  mode: string
+  score: number
+  correct: number
+  total: number
+  elapsed_seconds: number
   created_at: string
 }
 

@@ -48,6 +48,12 @@ export default function BanksPage() {
     load()
   }
 
+  async function toggleOpen(bank: QuestionBank) {
+    const next = !bank.is_open
+    setBanks(prev => prev.map(b => b.id === bank.id ? { ...b, is_open: next } : b))   // optimistic
+    await supabase.from('question_banks').update({ is_open: next }).eq('id', bank.id)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       <div className="bg-brand-600 px-4 pt-12 pb-5">
@@ -108,6 +114,14 @@ export default function BanksPage() {
                   </div>
                   <button onClick={() => handleDelete(bank.id)} className="text-red-400 px-2 py-1 active:scale-95 ml-2">🗑</button>
                 </div>
+                <label className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-50 cursor-pointer">
+                  <div>
+                    <span className="text-sm text-gray-700">Open to all students</span>
+                    <p className="text-xs text-gray-400">{bank.is_open ? 'Every student can take this exam' : 'Only students you assign can take this exam'}</p>
+                  </div>
+                  <input type="checkbox" className="w-5 h-5 accent-brand-600 flex-shrink-0"
+                    checked={bank.is_open} onChange={() => toggleOpen(bank)} />
+                </label>
               </div>
             ))}
           </div>

@@ -157,6 +157,84 @@ CREATE POLICY "Authenticated can delete question images" ON storage.objects
   FOR DELETE USING (bucket_id = 'question-images' AND public.is_admin());
 
 -- ============================================
+-- v2.3 — Student management & access control
+-- ============================================
+
+-- Banks: "open to all students" flag
+ALTER TABLE question_banks ADD COLUMN IF NOT EXISTS is_open BOOLEAN DEFAULT false;
+
+-- Profiles: last-active timestamp
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_active TIMESTAMPTZ;
+
+-- Admins can read every profile and change roles
+DROP POLICY IF EXISTS "Admins can read all profiles" ON profiles;
+CREATE POLICY "Admins can read all profiles" ON profiles FOR SELECT USING (public.is_admin());
+DROP POLICY IF EXISTS "Admins can update profiles" ON profiles;
+CREATE POLICY "Admins can update profiles" ON profiles FOR UPDATE USING (public.is_admin());
+
+-- Students stamp their own last_active without being able to edit their role
+CREATE OR REPLACE FUNCTION public.touch_last_active()
+RETURNS VOID LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
+  UPDATE public.profiles SET last_active = NOW() WHERE id = auth.uid();
+$$;
+
+-- Which student may use which bank
+CREATE TABLE IF NOT EXISTS bank_access (
+  student_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  bank_id UUID REFERENCES question_banks(id) ON DELETE CASCADE,
+  granted_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (student_id, bank_id)
+);
+ALTER TABLE bank_access ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admins manage bank access" ON bank_access;
+DROP POLICY IF EXISTS "Students read own bank access" ON bank_access;
+CREATE POLICY "Admins manage bank access" ON bank_access FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
+CREATE POLICY "Students read own bank access" ON bank_access FOR SELECT USING (auth.uid() = student_id);
+
+-- Exam attempts recorded server-side so admins can see activity
+CREATE TABLE IF NOT EXISTS attempts (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  bank_id UUID REFERENCES question_banks(id) ON DELETE SET NULL,
+  bank_name TEXT,
+  mode TEXT,
+  score INTEGER,
+  correct INTEGER,
+  total INTEGER,
+  elapsed_seconds INTEGER,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE attempts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users insert own attempts" ON attempts;
+DROP POLICY IF EXISTS "Users read own attempts" ON attempts;
+DROP POLICY IF EXISTS "Admins read all attempts" ON attempts;
+CREATE POLICY "Users insert own attempts" ON attempts FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users read own attempts" ON attempts FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Admins read all attempts" ON attempts FOR SELECT USING (public.is_admin());
+
+-- Restrict bank & question reads to assigned / open banks (admins still see all)
+DROP POLICY IF EXISTS "Anyone can read banks" ON question_banks;
+DROP POLICY IF EXISTS "Read assigned or open banks" ON question_banks;
+CREATE POLICY "Read assigned or open banks" ON question_banks FOR SELECT USING (
+  public.is_admin()
+  OR is_open
+  OR EXISTS (SELECT 1 FROM bank_access ba WHERE ba.bank_id = question_banks.id AND ba.student_id = auth.uid())
+);
+
+DROP POLICY IF EXISTS "Anyone can read questions" ON questions;
+DROP POLICY IF EXISTS "Read questions of assigned or open banks" ON questions;
+CREATE POLICY "Read questions of assigned or open banks" ON questions FOR SELECT USING (
+  public.is_admin()
+  OR EXISTS (
+    SELECT 1 FROM question_banks b
+    WHERE b.id = questions.bank_id
+      AND (b.is_open OR EXISTS (
+        SELECT 1 FROM bank_access ba WHERE ba.bank_id = b.id AND ba.student_id = auth.uid()
+      ))
+  )
+);
+
+-- ============================================
 -- 👑 MAKE YOURSELF ADMIN
 -- Replace the email with the one you log into the app with, then run this line:
 -- ============================================

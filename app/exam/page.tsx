@@ -138,6 +138,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
   questions: Question[]; mode: ExamMode; bankId: string; bankName: string; timeLimit: number | null
 }) {
   const router = useRouter()
+  const supabase = createClient()
   const [current, setCurrent] = useState(0)
   const [answers, setAnswers] = useState<ExamAnswer[]>(() =>
     questions.map(q => ({ questionId: q.id, selectedIndices: [], flagged: false, skipped: false, timeSpent: 0 }))
@@ -290,6 +291,15 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
     const history = JSON.parse(localStorage.getItem('examprep_history') || '[]')
     localStorage.setItem('examprep_history', JSON.stringify([attempt, ...history].slice(0, 50)))
     localStorage.removeItem(SESSION_KEY)
+
+    // Record the attempt server-side so admins can see student activity (fire-and-forget)
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase.from('attempts').insert({
+        user_id: user.id, bank_id: bankId || null, bank_name: bankName, mode,
+        score: attempt.score, correct: attempt.correct, total: attempt.total, elapsed_seconds: elapsed,
+      })
+    })
 
     const params = new URLSearchParams({ results: JSON.stringify(results), bankName, mode, elapsed: elapsed.toString() })
     router.push(`/results?${params}`)

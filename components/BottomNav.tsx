@@ -11,6 +11,7 @@ const baseTabs = [
 const adminTabs = [
   { href: '/admin/banks', label: 'Banks', icon: '📚' },
   { href: '/admin/questions', label: 'Questions', icon: '✏️' },
+  { href: '/admin/students', label: 'Students', icon: '👥' },
 ]
 
 export default function BottomNav() {
