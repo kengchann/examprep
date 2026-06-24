@@ -304,8 +304,9 @@ export default function QuestionsPage() {
                 {/* Question text */}
                 <div>
                   <label className="text-sm font-medium text-gray-600 block mb-1">Question</label>
-                  <textarea className="input-field resize-none" rows={3} placeholder="Type your question here…"
+                  <textarea className="input-field resize-y" rows={5} placeholder={"Type your question here…\n\nPress Enter for line breaks — they're kept exactly as you type them."}
                     value={questionText} onChange={e => setQuestionText(e.target.value)} required />
+                  <p className="text-xs text-gray-400 mt-1">Line breaks and indentation are preserved (good for code or config snippets).</p>
                 </div>
 
                 {/* Image / exhibit */}

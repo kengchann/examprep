@@ -384,7 +384,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
               {answer.flagged ? '🚩' : '⚑'}
             </button>
           </div>
-          <p className="text-gray-900 text-base leading-relaxed font-medium">{q.question_text}</p>
+          <p className="text-gray-900 text-base leading-relaxed font-medium whitespace-pre-wrap break-words">{q.question_text}</p>
           {q.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={q.image_url} alt="Exhibit" className="w-full rounded-xl border border-gray-100 mt-3" />
@@ -398,7 +398,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
               <span className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold mt-0.5 border-2 ${circleSyle(i)}`}>
                 {OPTION_LABELS[i] || i}
               </span>
-              <span className="text-sm leading-relaxed">{opt}</span>
+              <span className="text-sm leading-relaxed whitespace-pre-wrap break-words">{opt}</span>
               {confirmed && q.correct_indices.includes(i) && <span className="ml-auto text-green-600 flex-shrink-0">✓</span>}
             </button>
           ))}
@@ -408,7 +408,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
         {isLearning && confirmed && q.explanation && (
           <div className="mt-4 bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3">
             <p className="text-xs font-semibold text-blue-600 mb-1">Explanation</p>
-            <p className="text-sm text-blue-800 leading-relaxed">{q.explanation}</p>
+            <p className="text-sm text-blue-800 leading-relaxed whitespace-pre-wrap break-words">{q.explanation}</p>
           </div>
         )}
 

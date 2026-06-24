@@ -187,7 +187,7 @@ function ResultsContent() {
                           {r.question_type === 'multiple' ? 'Multi' : r.question_type === 'truefalse' ? 'T/F' : 'Single'}
                         </span>
                       </div>
-                      <p className="text-sm font-medium text-gray-800 leading-snug">{r.question_text}</p>
+                      <p className="text-sm font-medium text-gray-800 leading-snug whitespace-pre-wrap break-words">{r.question_text}</p>
                       {r.image_url && (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={r.image_url} alt="Exhibit" className="w-full rounded-lg border border-gray-100 mt-2" />
@@ -202,7 +202,7 @@ function ResultsContent() {
                         'text-gray-400'
                       }`}>
                         <span className="font-bold flex-shrink-0">{OPTION_LABELS[j]}.</span>
-                        <span className="flex-1">{opt}</span>
+                        <span className="flex-1 whitespace-pre-wrap break-words">{opt}</span>
                         {r.correct_indices.includes(j) && <span className="flex-shrink-0">✓</span>}
                         {r.selected_indices.includes(j) && !r.correct_indices.includes(j) && <span className="flex-shrink-0">✗</span>}
                       </div>
@@ -211,7 +211,7 @@ function ResultsContent() {
                   {r.explanation && (
                     <div className="mt-3 pl-7 border-t border-gray-50 pt-2">
                       <p className="text-xs text-blue-600 font-medium mb-0.5">Explanation</p>
-                      <p className="text-xs text-gray-600 leading-relaxed">{r.explanation}</p>
+                      <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap break-words">{r.explanation}</p>
                     </div>
                   )}
                 </div>
