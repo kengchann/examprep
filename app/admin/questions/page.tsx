@@ -442,10 +442,16 @@ export default function QuestionsPage() {
             )}
 
             {showForm && (
-              <form onSubmit={handleSave} className="card mb-4 space-y-4">
-                <h2 className="font-semibold text-gray-800">
-                  {editingQuestion ? `Edit Q${editingQuestion.order_index}` : 'New question'}
-                </h2>
+              <div className="fixed inset-0 bg-black/50 z-50 flex flex-col justify-end" onClick={() => { setShowForm(false); resetForm() }}>
+                <div className="bg-white rounded-t-3xl max-h-[92vh] w-full flex flex-col" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-shrink-0">
+                    <h2 className="font-semibold text-gray-800">
+                      {editingQuestion ? `Edit Q${editingQuestion.order_index}` : 'New question'}
+                    </h2>
+                    <button type="button" onClick={() => { setShowForm(false); resetForm() }}
+                      className="text-gray-400 text-2xl leading-none active:scale-95">×</button>
+                  </div>
+                  <form onSubmit={handleSave} className="overflow-y-auto px-4 py-4 space-y-4">
 
                 {/* Question type */}
                 <div>
@@ -546,7 +552,7 @@ export default function QuestionsPage() {
 
                 {error && <p className="text-red-600 text-sm">{error}</p>}
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 pt-2">
                   <button type="submit" disabled={saving}
                     className="flex-1 bg-brand-600 text-white font-medium py-3 rounded-xl active:scale-95 disabled:opacity-50">
                     {saving ? 'Saving…' : editingQuestion ? 'Update question' : 'Save question'}
@@ -556,7 +562,9 @@ export default function QuestionsPage() {
                     Cancel
                   </button>
                 </div>
-              </form>
+                  </form>
+                </div>
+              </div>
             )}
 
             {/* Count line */}
@@ -602,7 +610,7 @@ export default function QuestionsPage() {
                         </div>
                         <p className="text-sm text-gray-800 line-clamp-2">{q.question_text}</p>
                         <p className="text-xs text-green-600 mt-1">
-                          ✓ {q.correct_indices.map(i => q.options[i]).join(', ')}
+                          ✓ {q.correct_indices.map(i => `${OPTION_LABELS[i] ?? i + 1}. ${q.options[i]}`).join('   ')}
                         </p>
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
