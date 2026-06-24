@@ -243,12 +243,23 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
       return updated
     })
     if (current < questions.length - 1) {
-      setCurrent(current + 1)
-      setConfirmed(false)
+      const target = current + 1
+      setCurrent(target)
+      // In learning mode, a question already answered/skipped should show its result again
+      setConfirmed(isLearning ? (answers[target].selectedIndices.length > 0 || answers[target].skipped) : false)
       questionStartRef.current = Date.now()
     } else {
       submitExam()
     }
+  }
+
+  // Go back to the previous question (keeps answered/skipped state visible in learning mode)
+  function goPrev() {
+    if (current === 0) return
+    const target = current - 1
+    setCurrent(target)
+    setConfirmed(isLearning ? (answers[target].selectedIndices.length > 0 || answers[target].skipped) : false)
+    questionStartRef.current = Date.now()
   }
 
   function submitExam() {
@@ -423,11 +434,20 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
               {current < questions.length - 1 ? 'Next question →' : '📊 See results →'}
             </button>
           )}
-          {!confirmed && (
-            <button onClick={next} className="w-full text-gray-400 text-sm py-2 active:scale-95">
-              Skip question
-            </button>
-          )}
+          {/* Back / Skip row — Previous lets you revisit earlier questions in learning mode */}
+          <div className="flex gap-2">
+            {isLearning && current > 0 && (
+              <button onClick={goPrev}
+                className="flex-1 border border-gray-200 text-gray-600 text-sm font-medium py-2 rounded-xl active:scale-95">
+                ← Previous
+              </button>
+            )}
+            {!confirmed && (
+              <button onClick={next} className="flex-1 text-gray-400 text-sm py-2 active:scale-95">
+                Skip question
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
