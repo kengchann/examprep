@@ -8,16 +8,33 @@ import { parseQuestionCSV, CSV_TEMPLATE, type ParsedCSVRow } from '@/lib/csv'
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 const MAX_OPTIONS = 8
+const PAGE_SIZE = 50
+
+// Normalise text for duplicate comparison: trim, lowercase, collapse whitespace
+const normText = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ')
+
+type DupGroup = { text: string; items: { id: string; order_index: number; question_text: string }[] }
 
 export default function QuestionsPage() {
   const [banks, setBanks] = useState<QuestionBank[]>([])
   const [selectedBank, setSelectedBank] = useState('')
   const [questions, setQuestions] = useState<Question[]>([])
+  const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null)
+
+  // Search
+  const [search, setSearch] = useState('')
+  const [activeSearch, setActiveSearch] = useState('')
+
+  // Duplicate handling
+  const [duplicateOf, setDuplicateOf] = useState<{ order_index: number; question_text: string } | null>(null)
+  const [dupGroups, setDupGroups] = useState<DupGroup[] | null>(null)
+  const [scanningDups, setScanningDups] = useState(false)
 
   // CSV import state
   const [importRows, setImportRows] = useState<ParsedCSVRow[] | null>(null)
@@ -65,18 +82,33 @@ export default function QuestionsPage() {
     init()
   }, [])
 
-  useEffect(() => { if (selectedBank) loadQuestions() }, [selectedBank])
+  // Debounce the search box
+  useEffect(() => {
+    const t = setTimeout(() => setActiveSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
 
-  async function loadQuestions() {
-    setLoading(true)
-    const { data } = await supabase
+  useEffect(() => { if (selectedBank) loadQuestions(true) }, [selectedBank, activeSearch])
+
+  // reset=true reloads the first page; reset=false appends the next page
+  async function loadQuestions(reset: boolean) {
+    if (reset) setLoading(true); else setLoadingMore(true)
+    const from = reset ? 0 : questions.length
+    const to = from + PAGE_SIZE - 1
+    let query = supabase
       .from('questions')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('bank_id', selectedBank)
-      .order('order_index', { ascending: true })
-    setQuestions((data as Question[]) || [])
-    setLoading(false)
+    if (activeSearch.trim()) query = query.ilike('question_text', `%${activeSearch.trim()}%`)
+    const { data, count } = await query.order('order_index', { ascending: true }).range(from, to)
+    const rows = (data as Question[]) || []
+    setQuestions(prev => (reset ? rows : [...prev, ...rows]))
+    setTotalCount(count ?? 0)
+    setLoading(false); setLoadingMore(false)
   }
+
+  const searching = activeSearch.trim().length > 0
+  const hasMore = questions.length < totalCount
 
   function toggleCorrect(i: number) {
     if (qType === 'single' || qType === 'truefalse') {
@@ -136,19 +168,43 @@ export default function QuestionsPage() {
     e.target.value = ''
   }
 
+  function buildActiveOptions() {
+    return qType === 'truefalse' ? ['True', 'False'] : options.map(o => o.trim())
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
-    const activeOptions = qType === 'truefalse' ? ['True', 'False'] : options.map(o => o.trim())
+    const activeOptions = buildActiveOptions()
     if (qType !== 'truefalse') {
       if (activeOptions.length < 2) { setError('Add at least 2 answer options.'); return }
       if (activeOptions.some(o => !o)) { setError('Fill in every answer option, or remove the empty ones.'); return }
     }
     if (correctIndices.length === 0) { setError('Select at least one correct answer.'); return }
-    setSaving(true); setError('')
+    setError('')
+
+    // Duplicate guard — warn if an identical question already exists in this bank
+    setSaving(true)
+    let dq = supabase.from('questions')
+      .select('order_index, question_text')
+      .eq('bank_id', selectedBank)
+      .eq('question_text', questionText.trim())
+      .limit(1)
+    if (editingQuestion) dq = dq.neq('id', editingQuestion.id)
+    const { data: dups } = await dq
+    setSaving(false)
+    if (dups && dups.length > 0) { setDuplicateOf(dups[0] as { order_index: number; question_text: string }); return }
+
+    await doSave()
+  }
+
+  // Performs the actual insert/update (called after the duplicate check, or on "Save anyway")
+  async function doSave() {
+    setSaving(true); setError(''); setDuplicateOf(null)
+    const activeOptions = buildActiveOptions()
 
     if (editingQuestion) {
       const { error: err } = await supabase.from('questions').update({
-        question_text: questionText,
+        question_text: questionText.trim(),
         question_type: qType,
         options: activeOptions,
         correct_indices: correctIndices,
@@ -158,7 +214,7 @@ export default function QuestionsPage() {
       }).eq('id', editingQuestion.id)
 
       if (err) { setError(err.message) }
-      else { resetForm(); setShowForm(false); loadQuestions() }
+      else { resetForm(); setShowForm(false); loadQuestions(true) }
     } else {
       const { data: existing } = await supabase.from('questions')
         .select('order_index').eq('bank_id', selectedBank).order('order_index', { ascending: false }).limit(1)
@@ -166,7 +222,7 @@ export default function QuestionsPage() {
 
       const { error: err } = await supabase.from('questions').insert({
         bank_id: selectedBank,
-        question_text: questionText,
+        question_text: questionText.trim(),
         question_type: qType,
         options: activeOptions,
         correct_indices: correctIndices,
@@ -179,7 +235,8 @@ export default function QuestionsPage() {
       if (err) { setError(err.message) }
       else {
         await supabase.rpc('increment_question_count', { bank_id_param: selectedBank })
-        resetForm(); setShowForm(false); loadQuestions()
+        setBanks(prev => prev.map(b => b.id === selectedBank ? { ...b, question_count: b.question_count + 1 } : b))
+        resetForm(); setShowForm(false); loadQuestions(true)
       }
     }
     setSaving(false)
@@ -235,7 +292,7 @@ export default function QuestionsPage() {
       setBanks(prev => prev.map(b => b.id === selectedBank
         ? { ...b, question_count: b.question_count + valid.length } : b))
       setImportRows(null)
-      loadQuestions()
+      loadQuestions(true)
     }
     setImporting(false)
   }
@@ -244,24 +301,75 @@ export default function QuestionsPage() {
     if (!confirm('Delete this question?')) return
     await supabase.from('questions').delete().eq('id', q.id)
     await supabase.rpc('decrement_question_count', { bank_id_param: selectedBank })
-    loadQuestions()
+    setBanks(prev => prev.map(b => b.id === selectedBank ? { ...b, question_count: Math.max(0, b.question_count - 1) } : b))
+    loadQuestions(true)
   }
 
-  // Move a question up (-1) or down (+1) and renumber order_index 1..N in the database
+  // Swap a question with its neighbour (up = -1, down = +1). Only within the loaded list.
   async function moveQuestion(index: number, dir: -1 | 1) {
+    if (searching) return
     const target = index + dir
     if (target < 0 || target >= questions.length) return
-    const reordered = [...questions]
-    const [moved] = reordered.splice(index, 1)
-    reordered.splice(target, 0, moved)
-    setQuestions(reordered)   // optimistic update for snappy UI
+    const a = questions[index], b = questions[target]
+    // Optimistic swap — also swap the displayed order_index so numbers stay in order
+    const arr = [...questions]
+    arr[index] = { ...b, order_index: a.order_index }
+    arr[target] = { ...a, order_index: b.order_index }
+    setQuestions(arr)
+    await supabase.from('questions').update({ order_index: b.order_index }).eq('id', a.id)
+    await supabase.from('questions').update({ order_index: a.order_index }).eq('id', b.id)
+  }
+
+  // Move a question to an arbitrary position (1..N), renumbering the affected range
+  async function moveToPosition(q: Question) {
+    if (searching) return
+    const input = window.prompt(`Move this question to which position? (1–${totalCount})`, String(q.order_index))
+    if (input === null) return
+    const target = parseInt(input, 10)
+    if (!target || target < 1 || target > totalCount) { alert('Please enter a valid position number.'); return }
+
+    const { data } = await supabase.from('questions')
+      .select('id, order_index').eq('bank_id', selectedBank).order('order_index', { ascending: true })
+    const list = (data || []) as { id: string; order_index: number }[]
+    const fromIdx = list.findIndex(r => r.id === q.id)
+    if (fromIdx === -1) return
+    const [moved] = list.splice(fromIdx, 1)
+    list.splice(target - 1, 0, moved)
+    // Normalize to 1..N, persist only the rows whose number changed
     await Promise.all(
-      reordered
-        .map((q, i) => (q.order_index !== i + 1 ? { id: q.id, order_index: i + 1 } : null))
-        .filter((x): x is { id: string; order_index: number } => x !== null)
-        .map(u => supabase.from('questions').update({ order_index: u.order_index }).eq('id', u.id))
+      list
+        .map((r, i) => (r.order_index !== i + 1 ? { id: r.id, ni: i + 1 } : null))
+        .filter((x): x is { id: string; ni: number } => x !== null)
+        .map(u => supabase.from('questions').update({ order_index: u.ni }).eq('id', u.id))
     )
-    loadQuestions()
+    loadQuestions(true)
+  }
+
+  // Scan the whole bank for duplicate question text (normalized)
+  async function findDuplicates() {
+    setScanningDups(true)
+    const { data } = await supabase.from('questions')
+      .select('id, order_index, question_text').eq('bank_id', selectedBank).order('order_index', { ascending: true })
+    const map = new Map<string, { id: string; order_index: number; question_text: string }[]>()
+    for (const r of (data || []) as { id: string; order_index: number; question_text: string }[]) {
+      const k = normText(r.question_text)
+      if (!k) continue
+      const arr = map.get(k) || []
+      arr.push(r); map.set(k, arr)
+    }
+    const groups: DupGroup[] = []
+    map.forEach((items, text) => { if (items.length > 1) groups.push({ text, items }) })
+    setDupGroups(groups)
+    setScanningDups(false)
+  }
+
+  async function deleteFromScanner(id: string) {
+    if (!confirm('Delete this question?')) return
+    await supabase.from('questions').delete().eq('id', id)
+    await supabase.rpc('decrement_question_count', { bank_id_param: selectedBank })
+    setBanks(prev => prev.map(b => b.id === selectedBank ? { ...b, question_count: Math.max(0, b.question_count - 1) } : b))
+    await findDuplicates()
+    loadQuestions(true)
   }
 
   const tfOptions = ['True', 'False']
@@ -306,15 +414,37 @@ export default function QuestionsPage() {
               </div>
             )}
             {!showForm && (
-              <button onClick={downloadTemplate} className="text-xs text-gray-400 -mt-2 mb-4 active:scale-95">
+              <button onClick={downloadTemplate} className="text-xs text-gray-400 -mt-2 mb-3 active:scale-95 block">
                 Need the format? Download CSV template
               </button>
+            )}
+
+            {/* Search + duplicate scanner */}
+            {!showForm && (
+              <div className="mb-3 space-y-2">
+                <div className="relative">
+                  <input
+                    className="input-field pr-9"
+                    placeholder="🔍 Search questions…"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                  />
+                  {search && (
+                    <button onClick={() => setSearch('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg leading-none">×</button>
+                  )}
+                </div>
+                <button onClick={findDuplicates} disabled={scanningDups}
+                  className="text-xs font-medium text-brand-600 active:scale-95 disabled:opacity-50">
+                  {scanningDups ? 'Scanning…' : '🔁 Find duplicate questions'}
+                </button>
+              </div>
             )}
 
             {showForm && (
               <form onSubmit={handleSave} className="card mb-4 space-y-4">
                 <h2 className="font-semibold text-gray-800">
-                  {editingQuestion ? `Edit Q${questions.findIndex(q => q.id === editingQuestion.id) + 1}` : 'New question'}
+                  {editingQuestion ? `Edit Q${editingQuestion.order_index}` : 'New question'}
                 </h2>
 
                 {/* Question type */}
@@ -429,11 +559,22 @@ export default function QuestionsPage() {
               </form>
             )}
 
+            {/* Count line */}
+            {!showForm && !loading && totalCount > 0 && (
+              <p className="text-xs text-gray-400 mb-2">
+                {searching
+                  ? `${totalCount} match${totalCount !== 1 ? 'es' : ''} for “${activeSearch.trim()}”`
+                  : `${totalCount} question${totalCount !== 1 ? 's' : ''} in this bank`}
+              </p>
+            )}
+
             {/* Questions list */}
             {loading ? (
               <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="card animate-pulse h-20 bg-gray-100" />)}</div>
             ) : questions.length === 0 ? (
-              <div className="card text-center py-8"><p className="text-gray-400 text-sm">No questions yet.</p></div>
+              <div className="card text-center py-8">
+                <p className="text-gray-400 text-sm">{searching ? 'No questions match your search.' : 'No questions yet.'}</p>
+              </div>
             ) : (
               <div className="space-y-2">
                 {questions.map((q, idx) => (
@@ -441,7 +582,14 @@ export default function QuestionsPage() {
                     <div className="flex justify-between items-start gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-bold text-brand-600">Q{idx + 1}</span>
+                          <button
+                            onClick={() => moveToPosition(q)}
+                            disabled={searching}
+                            className="text-xs font-bold text-brand-600 active:scale-95 disabled:opacity-60"
+                            title={searching ? '' : 'Tap to move to a position'}
+                          >
+                            Q{q.order_index}
+                          </button>
                           <span className={`tag text-xs ${
                             q.question_type === 'multiple' ? 'bg-purple-100 text-purple-700' :
                             q.question_type === 'truefalse' ? 'bg-blue-100 text-blue-700' :
@@ -458,24 +606,26 @@ export default function QuestionsPage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        <div className="flex flex-col">
-                          <button
-                            onClick={() => moveQuestion(idx, -1)}
-                            disabled={idx === 0}
-                            className="text-gray-400 leading-none px-1 active:scale-95 disabled:opacity-20"
-                            title="Move up"
-                          >
-                            ▲
-                          </button>
-                          <button
-                            onClick={() => moveQuestion(idx, 1)}
-                            disabled={idx === questions.length - 1}
-                            className="text-gray-400 leading-none px-1 active:scale-95 disabled:opacity-20"
-                            title="Move down"
-                          >
-                            ▼
-                          </button>
-                        </div>
+                        {!searching && (
+                          <div className="flex flex-col">
+                            <button
+                              onClick={() => moveQuestion(idx, -1)}
+                              disabled={idx === 0}
+                              className="text-gray-400 leading-none px-1 active:scale-95 disabled:opacity-20"
+                              title="Move up"
+                            >
+                              ▲
+                            </button>
+                            <button
+                              onClick={() => moveQuestion(idx, 1)}
+                              disabled={idx === questions.length - 1}
+                              className="text-gray-400 leading-none px-1 active:scale-95 disabled:opacity-20"
+                              title="Move down"
+                            >
+                              ▼
+                            </button>
+                          </div>
+                        )}
                         <button
                           onClick={() => openEditForm(q)}
                           className="text-brand-600 px-1 py-1 active:scale-95"
@@ -494,6 +644,16 @@ export default function QuestionsPage() {
                     </div>
                   </div>
                 ))}
+
+                {hasMore && (
+                  <button
+                    onClick={() => loadQuestions(false)}
+                    disabled={loadingMore}
+                    className="w-full border border-gray-200 text-gray-600 font-medium py-3 rounded-xl active:scale-95 disabled:opacity-50"
+                  >
+                    {loadingMore ? 'Loading…' : `Load more (${questions.length} of ${totalCount})`}
+                  </button>
+                )}
               </div>
             )}
           </>
@@ -557,6 +717,77 @@ export default function QuestionsPage() {
                 </>
               )
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* Floating Add button — always reachable without scrolling up */}
+      {banks.length > 0 && !showForm && !importRows && !dupGroups && (
+        <button
+          onClick={() => { resetForm(); setShowForm(true); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+          className="fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-brand-600 text-white text-3xl shadow-lg flex items-center justify-center active:scale-95"
+          title="Add question"
+          aria-label="Add question"
+        >
+          +
+        </button>
+      )}
+
+      {/* Duplicate warning */}
+      {duplicateOf && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-6" onClick={() => setDuplicateOf(null)}>
+          <div className="bg-white rounded-2xl p-5 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+            <p className="text-2xl mb-2">⚠️</p>
+            <h3 className="font-semibold text-gray-800 mb-1">Possible duplicate</h3>
+            <p className="text-sm text-gray-600 mb-3">
+              A question with the same text already exists in this bank (Q{duplicateOf.order_index}). Save it anyway?
+            </p>
+            <div className="flex gap-2">
+              <button onClick={doSave} disabled={saving}
+                className="flex-1 bg-brand-600 text-white font-medium py-2.5 rounded-xl active:scale-95 disabled:opacity-50">
+                {saving ? 'Saving…' : 'Save anyway'}
+              </button>
+              <button onClick={() => setDuplicateOf(null)}
+                className="flex-1 border border-gray-300 text-gray-600 font-medium py-2.5 rounded-xl active:scale-95">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Duplicate scanner results */}
+      {dupGroups && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex flex-col justify-end" onClick={() => setDupGroups(null)}>
+          <div className="bg-white rounded-t-3xl px-4 pt-4 pb-8 max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-800">Duplicate questions</h3>
+              <button onClick={() => setDupGroups(null)} className="text-gray-400 text-2xl leading-none">×</button>
+            </div>
+            {dupGroups.length === 0 ? (
+              <div className="text-center py-10">
+                <p className="text-3xl mb-2">✅</p>
+                <p className="text-sm text-gray-500">No duplicates found — your bank is clean!</p>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto space-y-3">
+                <p className="text-xs text-gray-400">{dupGroups.length} set{dupGroups.length !== 1 ? 's' : ''} of duplicates found. Delete the extras you don’t need.</p>
+                {dupGroups.map((g, gi) => (
+                  <div key={gi} className="border border-amber-200 bg-amber-50 rounded-xl p-3">
+                    <p className="text-sm text-gray-800 line-clamp-2 mb-2">{g.items[0].question_text}</p>
+                    <div className="space-y-1">
+                      {g.items.map(it => (
+                        <div key={it.id} className="flex items-center justify-between gap-2 bg-white rounded-lg px-2 py-1.5">
+                          <span className="text-xs font-bold text-brand-600">Q{it.order_index}</span>
+                          <button onClick={() => deleteFromScanner(it.id)}
+                            className="text-red-400 text-xs active:scale-95">🗑 Delete</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
