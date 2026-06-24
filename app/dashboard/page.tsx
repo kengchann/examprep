@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import BottomNav from '@/components/BottomNav'
 import Link from 'next/link'
+import { useUserRole } from '@/lib/useUserRole'
 import type { QuestionBank, ExamMode } from '@/lib/types'
 
 const categoryIcon: Record<string, string> = { IT: '💻', Academic: '📖', Other: '📝' }
@@ -20,6 +21,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [selectedBank, setSelectedBank] = useState<QuestionBank | null>(null)
   const [selectedMode, setSelectedMode] = useState<ExamMode>('practice')
+  const { isAdmin } = useUserRole()
   const router = useRouter()
   const supabase = createClient()
 
@@ -57,7 +59,10 @@ export default function Dashboard() {
         <div className="flex justify-between items-start">
           <div>
             <p className="text-brand-200 text-sm">Welcome back,</p>
-            <h1 className="text-white text-xl font-bold">{userName} 👋</h1>
+            <h1 className="text-white text-xl font-bold">
+              {userName} 👋
+              {isAdmin && <span className="ml-2 align-middle text-xs font-semibold bg-white/20 text-white px-2 py-0.5 rounded-full">Admin</span>}
+            </h1>
           </div>
           <button onClick={signOut} className="text-brand-200 text-sm py-1 px-3 rounded-lg border border-brand-400 active:scale-95">
             Sign out
@@ -74,8 +79,10 @@ export default function Dashboard() {
           ) : banks.length === 0 ? (
             <div className="card text-center py-8">
               <p className="text-3xl mb-2">📭</p>
-              <p className="text-sm text-gray-500">No banks yet.</p>
-              <Link href="/admin/banks" className="btn-primary mt-3 text-sm">Create a bank</Link>
+              <p className="text-sm text-gray-500">
+                {isAdmin ? 'No banks yet.' : 'No exam banks available yet. Check back soon!'}
+              </p>
+              {isAdmin && <Link href="/admin/banks" className="btn-primary mt-3 text-sm">Create a bank</Link>}
             </div>
           ) : (
             <div className="space-y-2">

@@ -1,16 +1,23 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useUserRole } from '@/lib/useUserRole'
 
-const tabs = [
+const baseTabs = [
   { href: '/dashboard', label: 'Home', icon: '🏠' },
   { href: '/history', label: 'History', icon: '📊' },
+]
+
+const adminTabs = [
   { href: '/admin/banks', label: 'Banks', icon: '📚' },
   { href: '/admin/questions', label: 'Questions', icon: '✏️' },
 ]
 
 export default function BottomNav() {
   const pathname = usePathname()
+  const { isAdmin } = useUserRole()
+  const tabs = isAdmin ? [...baseTabs, ...adminTabs] : baseTabs
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex z-50">
       {tabs.map(tab => {
