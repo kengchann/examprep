@@ -6,7 +6,8 @@ import BottomNav from '@/components/BottomNav'
 import type { Question, QuestionBank, QuestionType } from '@/lib/types'
 import { parseQuestionCSV, CSV_TEMPLATE, type ParsedCSVRow } from '@/lib/csv'
 
-const OPTION_LABELS = ['A', 'B', 'C', 'D']
+const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+const MAX_OPTIONS = 8
 
 export default function QuestionsPage() {
   const [banks, setBanks] = useState<QuestionBank[]>([])
@@ -87,6 +88,17 @@ export default function QuestionsPage() {
     }
   }
 
+  function addOption() {
+    setOptions(prev => prev.length < MAX_OPTIONS ? [...prev, ''] : prev)
+  }
+
+  function removeOption(i: number) {
+    if (options.length <= 2) return
+    setOptions(prev => prev.filter((_, idx) => idx !== i))
+    // Drop this index from correct answers and shift higher indices down
+    setCorrectIndices(prev => prev.filter(x => x !== i).map(x => (x > i ? x - 1 : x)))
+  }
+
   function resetForm() {
     setQuestionText(''); setOptions(['', '', '', '']); setCorrectIndices([0])
     setExplanation(''); setTopic(''); setQType('single'); setError('')
@@ -97,7 +109,7 @@ export default function QuestionsPage() {
     setEditingQuestion(q)
     setQType(q.question_type)
     setQuestionText(q.question_text)
-    setOptions(q.question_type === 'truefalse' ? ['', '', '', ''] : [...q.options, ...Array(4)].slice(0, 4).map(o => o ?? ''))
+    setOptions(q.question_type === 'truefalse' ? ['', '', '', ''] : q.options.map(o => o ?? ''))
     setCorrectIndices([...q.correct_indices])
     setExplanation(q.explanation ?? '')
     setTopic(q.topic ?? '')
@@ -126,9 +138,10 @@ export default function QuestionsPage() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
-    const activeOptions = qType === 'truefalse' ? ['True', 'False'] : options
-    if (qType !== 'truefalse' && activeOptions.some(o => !o.trim())) {
-      setError('Fill in all 4 answer options.'); return
+    const activeOptions = qType === 'truefalse' ? ['True', 'False'] : options.map(o => o.trim())
+    if (qType !== 'truefalse') {
+      if (activeOptions.length < 2) { setError('Add at least 2 answer options.'); return }
+      if (activeOptions.some(o => !o)) { setError('Fill in every answer option, or remove the empty ones.'); return }
     }
     if (correctIndices.length === 0) { setError('Select at least one correct answer.'); return }
     setSaving(true); setError('')
@@ -231,6 +244,23 @@ export default function QuestionsPage() {
     if (!confirm('Delete this question?')) return
     await supabase.from('questions').delete().eq('id', q.id)
     await supabase.rpc('decrement_question_count', { bank_id_param: selectedBank })
+    loadQuestions()
+  }
+
+  // Move a question up (-1) or down (+1) and renumber order_index 1..N in the database
+  async function moveQuestion(index: number, dir: -1 | 1) {
+    const target = index + dir
+    if (target < 0 || target >= questions.length) return
+    const reordered = [...questions]
+    const [moved] = reordered.splice(index, 1)
+    reordered.splice(target, 0, moved)
+    setQuestions(reordered)   // optimistic update for snappy UI
+    await Promise.all(
+      reordered
+        .map((q, i) => (q.order_index !== i + 1 ? { id: q.id, order_index: i + 1 } : null))
+        .filter((x): x is { id: string; order_index: number } => x !== null)
+        .map(u => supabase.from('questions').update({ order_index: u.order_index }).eq('id', u.id))
+    )
     loadQuestions()
   }
 
@@ -347,11 +377,25 @@ export default function QuestionsPage() {
                       {qType === 'truefalse' ? (
                         <span className="text-sm text-gray-700 font-medium">{opt}</span>
                       ) : (
-                        <input className="input-field" placeholder={`Option ${OPTION_LABELS[i]}`}
-                          value={opt} onChange={e => { const o = [...options]; o[i] = e.target.value; setOptions(o) }} />
+                        <>
+                          <input className="input-field" placeholder={`Option ${OPTION_LABELS[i]}`}
+                            value={opt} onChange={e => { const o = [...options]; o[i] = e.target.value; setOptions(o) }} />
+                          {options.length > 2 && (
+                            <button type="button" onClick={() => removeOption(i)}
+                              className="text-gray-300 text-lg px-1 active:scale-95 flex-shrink-0" title="Remove option">
+                              ✕
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   ))}
+                  {qType !== 'truefalse' && options.length < MAX_OPTIONS && (
+                    <button type="button" onClick={addOption}
+                      className="text-sm font-medium text-brand-600 active:scale-95">
+                      + Add option
+                    </button>
+                  )}
                   <p className="text-xs text-gray-400">Tap the letter/circle to mark the correct answer(s)</p>
                 </div>
 
@@ -414,6 +458,24 @@ export default function QuestionsPage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
+                        <div className="flex flex-col">
+                          <button
+                            onClick={() => moveQuestion(idx, -1)}
+                            disabled={idx === 0}
+                            className="text-gray-400 leading-none px-1 active:scale-95 disabled:opacity-20"
+                            title="Move up"
+                          >
+                            ▲
+                          </button>
+                          <button
+                            onClick={() => moveQuestion(idx, 1)}
+                            disabled={idx === questions.length - 1}
+                            className="text-gray-400 leading-none px-1 active:scale-95 disabled:opacity-20"
+                            title="Move down"
+                          >
+                            ▼
+                          </button>
+                        </div>
                         <button
                           onClick={() => openEditForm(q)}
                           className="text-brand-600 px-1 py-1 active:scale-95"

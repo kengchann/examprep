@@ -57,6 +57,8 @@ function parseCorrect(raw: string, optionCount: number): { indices: number[]; er
   return { indices: indices.sort((a, b) => a - b) }
 }
 
+const OPTION_KEYS = ['option_a', 'option_b', 'option_c', 'option_d', 'option_e', 'option_f', 'option_g', 'option_h']
+
 const HEADER_ALIASES: Record<string, string> = {
   question: 'question_text', question_text: 'question_text', text: 'question_text',
   type: 'question_type', question_type: 'question_type',
@@ -64,6 +66,10 @@ const HEADER_ALIASES: Record<string, string> = {
   option_b: 'option_b', b: 'option_b',
   option_c: 'option_c', c: 'option_c',
   option_d: 'option_d', d: 'option_d',
+  option_e: 'option_e', e: 'option_e',
+  option_f: 'option_f', f: 'option_f',
+  option_g: 'option_g', g: 'option_g',
+  option_h: 'option_h', h: 'option_h',
   correct: 'correct_indices', correct_indices: 'correct_indices', answer: 'correct_indices', answers: 'correct_indices',
   explanation: 'explanation', explain: 'explanation',
   topic: 'topic', domain: 'topic',
@@ -92,7 +98,7 @@ export function parseQuestionCSV(text: string): ParsedCSVRow[] {
     if (question_type === 'truefalse') {
       options = ['True', 'False']
     } else {
-      options = [get(r, 'option_a'), get(r, 'option_b'), get(r, 'option_c'), get(r, 'option_d')].filter(o => o !== '')
+      options = OPTION_KEYS.map(k => get(r, k)).filter(o => o !== '')
     }
 
     const base: ParsedCSVRow = {
@@ -117,7 +123,7 @@ export function parseQuestionCSV(text: string): ParsedCSVRow[] {
 }
 
 export const CSV_TEMPLATE =
-  'question_text,question_type,option_a,option_b,option_c,option_d,correct_indices,explanation,topic\n' +
-  '"What does CPU stand for?",single,"Central Processing Unit","Computer Power Unit","Central Print Unit","Core Processing Unit",A,"The CPU is the brain of the computer.",Hardware\n' +
-  '"Which are valid IP versions? (select all)",multiple,"IPv4","IPv6","IPv5","IPv8","A,B","IPv4 and IPv6 are in use.",Networking\n' +
-  '"TCP is connection-oriented.",truefalse,,,,,A,"TCP establishes a connection before sending data.",Networking\n'
+  'question_text,question_type,option_a,option_b,option_c,option_d,option_e,option_f,correct_indices,explanation,topic\n' +
+  '"What does CPU stand for?",single,"Central Processing Unit","Computer Power Unit","Central Print Unit","Core Processing Unit",,,A,"The CPU is the brain of the computer.",Hardware\n' +
+  '"Which TWO steps protect an S3 bucket from accidental deletion? (Choose two.)",multiple,"Enable versioning","Enable MFA Delete","Create a bucket policy","Enable default encryption","Create a lifecycle policy",,"A,B","Versioning plus MFA Delete prevent accidental deletion.",Storage\n' +
+  '"TCP is connection-oriented.",truefalse,,,,,,,A,"TCP establishes a connection before sending data.",Networking\n'

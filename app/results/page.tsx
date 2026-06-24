@@ -3,7 +3,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { Suspense, useState } from 'react'
 import type { AttemptResult } from '@/lib/types'
 
-const OPTION_LABELS = ['A', 'B', 'C', 'D']
+const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
 function ResultsContent() {
   const params = useSearchParams()
