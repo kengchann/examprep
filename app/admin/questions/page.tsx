@@ -442,8 +442,8 @@ export default function QuestionsPage() {
             )}
 
             {showForm && (
-              <div className="fixed inset-0 bg-black/50 z-50 flex flex-col justify-end" onClick={() => { setShowForm(false); resetForm() }}>
-                <div className="bg-white rounded-t-3xl max-h-[92vh] w-full flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="fixed inset-0 bg-black/50 z-[60] flex flex-col justify-end" onClick={() => { setShowForm(false); resetForm() }}>
+                <div className="bg-white rounded-t-3xl max-h-[90vh] w-full flex flex-col" onClick={e => e.stopPropagation()}>
                   <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-shrink-0">
                     <h2 className="font-semibold text-gray-800">
                       {editingQuestion ? `Edit Q${editingQuestion.order_index}` : 'New question'}
@@ -451,7 +451,8 @@ export default function QuestionsPage() {
                     <button type="button" onClick={() => { setShowForm(false); resetForm() }}
                       className="text-gray-400 text-2xl leading-none active:scale-95">×</button>
                   </div>
-                  <form onSubmit={handleSave} className="overflow-y-auto px-4 py-4 space-y-4">
+                  <form onSubmit={handleSave} className="flex-1 min-h-0 flex flex-col">
+                  <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
 
                 {/* Question type */}
                 <div>
@@ -551,17 +552,18 @@ export default function QuestionsPage() {
                 </div>
 
                 {error && <p className="text-red-600 text-sm">{error}</p>}
+                  </div>
 
-                <div className="flex gap-2 pt-2">
-                  <button type="submit" disabled={saving}
-                    className="flex-1 bg-brand-600 text-white font-medium py-3 rounded-xl active:scale-95 disabled:opacity-50">
-                    {saving ? 'Saving…' : editingQuestion ? 'Update question' : 'Save question'}
-                  </button>
-                  <button type="button" onClick={() => { setShowForm(false); resetForm() }}
-                    className="flex-1 border border-gray-300 text-gray-600 font-medium py-3 rounded-xl active:scale-95">
-                    Cancel
-                  </button>
-                </div>
+                  <div className="flex gap-2 px-4 py-3 border-t border-gray-100 flex-shrink-0">
+                    <button type="submit" disabled={saving}
+                      className="flex-1 bg-brand-600 text-white font-medium py-3 rounded-xl active:scale-95 disabled:opacity-50">
+                      {saving ? 'Saving…' : editingQuestion ? 'Update question' : 'Save question'}
+                    </button>
+                    <button type="button" onClick={() => { setShowForm(false); resetForm() }}
+                      className="flex-1 border border-gray-300 text-gray-600 font-medium py-3 rounded-xl active:scale-95">
+                      Cancel
+                    </button>
+                  </div>
                   </form>
                 </div>
               </div>
@@ -670,7 +672,7 @@ export default function QuestionsPage() {
 
       {/* CSV import preview modal */}
       {importRows && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex flex-col justify-end" onClick={() => !importing && setImportRows(null)}>
+        <div className="fixed inset-0 bg-black/50 z-[60] flex flex-col justify-end" onClick={() => !importing && setImportRows(null)}>
           <div className="bg-white rounded-t-3xl px-4 pt-4 pb-8 max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-gray-800">Import preview</h3>
@@ -743,7 +745,7 @@ export default function QuestionsPage() {
 
       {/* Duplicate warning */}
       {duplicateOf && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-6" onClick={() => setDuplicateOf(null)}>
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center px-6" onClick={() => setDuplicateOf(null)}>
           <div className="bg-white rounded-2xl p-5 max-w-sm w-full" onClick={e => e.stopPropagation()}>
             <p className="text-2xl mb-2">⚠️</p>
             <h3 className="font-semibold text-gray-800 mb-1">Possible duplicate</h3>
@@ -766,7 +768,7 @@ export default function QuestionsPage() {
 
       {/* Duplicate scanner results */}
       {dupGroups && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex flex-col justify-end" onClick={() => setDupGroups(null)}>
+        <div className="fixed inset-0 bg-black/50 z-[60] flex flex-col justify-end" onClick={() => setDupGroups(null)}>
           <div className="bg-white rounded-t-3xl px-4 pt-4 pb-8 max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-gray-800">Duplicate questions</h3>
