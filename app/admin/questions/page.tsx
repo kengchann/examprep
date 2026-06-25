@@ -41,11 +41,16 @@ export default function QuestionsPage() {
   const [importing, setImporting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Screenshot extraction state
+  const [extracting, setExtracting] = useState(false)
+  const [extractNote, setExtractNote] = useState('')
+  const screenshotInputRef = useRef<HTMLInputElement>(null)
+
   // Form state
   const [qType, setQType] = useState<QuestionType>('single')
   const [questionText, setQuestionText] = useState('')
   const [options, setOptions] = useState(['', '', '', ''])
-  const [correctIndices, setCorrectIndices] = useState<number[]>([0])
+  const [correctIndices, setCorrectIndices] = useState<number[]>([])
   const [explanation, setExplanation] = useState('')
   const [topic, setTopic] = useState('')
   const [imageUrl, setImageUrl] = useState<string | null>(null)
@@ -99,7 +104,10 @@ export default function QuestionsPage() {
       .from('questions')
       .select('*', { count: 'exact' })
       .eq('bank_id', selectedBank)
-    if (activeSearch.trim()) query = query.ilike('question_text', `%${activeSearch.trim()}%`)
+    const trimmed = activeSearch.trim()
+    const numMatch = trimmed.match(/^q?\s*(\d+)$/i)   // "Q99", "q 99", or "99" → search by number
+    if (numMatch) query = query.eq('order_index', parseInt(numMatch[1], 10))
+    else if (trimmed) query = query.ilike('question_text', `%${trimmed}%`)
     const { data, count } = await query.order('order_index', { ascending: true }).range(from, to)
     const rows = (data as Question[]) || []
     setQuestions(prev => (reset ? rows : [...prev, ...rows]))
@@ -132,9 +140,9 @@ export default function QuestionsPage() {
   }
 
   function resetForm() {
-    setQuestionText(''); setOptions(['', '', '', '']); setCorrectIndices([0])
+    setQuestionText(''); setOptions(['', '', '', '']); setCorrectIndices([])
     setExplanation(''); setTopic(''); setQType('single'); setError('')
-    setImageUrl(null); setEditingQuestion(null)
+    setImageUrl(null); setEditingQuestion(null); setExtractNote('')
   }
 
   function openEditForm(q: Question) {
@@ -240,6 +248,53 @@ export default function QuestionsPage() {
       }
     }
     setSaving(false)
+  }
+
+  async function handleScreenshot(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) { setError('Screenshot must be under 5 MB.'); return }
+
+    setExtracting(true); setError(''); setExtractNote('')
+    try {
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result))
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      const base64 = dataUrl.split(',')[1]
+
+      const res = await fetch('/api/extract-question', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64, mediaType: file.type }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error || 'Could not extract the question.'); return }
+
+      // Pre-fill the form for the admin to verify
+      const type = (data.question_type as QuestionType) || 'single'
+      setQType(type)
+      setQuestionText(data.question_text || '')
+      if (type !== 'truefalse') {
+        const opts = Array.isArray(data.options) ? data.options.map((o: string) => o ?? '') : []
+        setOptions(opts.length >= 2 ? opts.slice(0, MAX_OPTIONS) : [...opts, '', ''].slice(0, 4))
+      }
+      setCorrectIndices(Array.isArray(data.correct_indices) ? data.correct_indices : [])
+      setExplanation(data.explanation || '')
+      setTopic(data.topic || '')
+      setExtractNote(
+        (Array.isArray(data.correct_indices) && data.correct_indices.length > 0)
+          ? 'Extracted. Double-check everything — especially the correct answer.'
+          : 'Extracted. The answer wasn’t in the image — tap the correct option(s) before saving.'
+      )
+    } catch {
+      setError('Could not read that screenshot. Try again.')
+    } finally {
+      setExtracting(false)
+    }
   }
 
   function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
@@ -425,7 +480,7 @@ export default function QuestionsPage() {
                 <div className="relative">
                   <input
                     className="input-field pr-9"
-                    placeholder="🔍 Search questions…"
+                    placeholder="🔍 Search text or number (e.g. Q99)…"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                   />
@@ -454,12 +509,24 @@ export default function QuestionsPage() {
                   <form onSubmit={handleSave} className="flex-1 min-h-0 flex flex-col">
                   <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
 
+                {/* Extract from screenshot */}
+                {!editingQuestion && (
+                  <div>
+                    <button type="button" onClick={() => screenshotInputRef.current?.click()} disabled={extracting}
+                      className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-brand-300 text-brand-600 font-medium py-3 rounded-xl active:scale-95 disabled:opacity-50">
+                      {extracting ? 'Reading screenshot…' : '📷 Fill from a screenshot (AI)'}
+                    </button>
+                    <input ref={screenshotInputRef} type="file" accept="image/*" className="hidden" onChange={handleScreenshot} />
+                    {extractNote && <p className="text-xs text-amber-600 mt-1.5">⚠️ {extractNote}</p>}
+                  </div>
+                )}
+
                 {/* Question type */}
                 <div>
                   <label className="text-sm font-medium text-gray-600 block mb-2">Question type</label>
                   <div className="flex gap-2">
                     {([['single','Single'], ['multiple','Multiple'], ['truefalse','True/False']] as [QuestionType, string][]).map(([val, label]) => (
-                      <button key={val} type="button" onClick={() => { setQType(val); setCorrectIndices([0]) }}
+                      <button key={val} type="button" onClick={() => { setQType(val); setCorrectIndices([]) }}
                         className={`flex-1 py-2 text-xs font-medium rounded-lg border transition-all ${qType === val ? 'bg-brand-600 text-white border-brand-600' : 'border-gray-200 text-gray-600'}`}>
                         {label}
                       </button>
