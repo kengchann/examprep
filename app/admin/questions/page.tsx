@@ -15,6 +15,18 @@ const normText = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ')
 
 type DupGroup = { text: string; items: { id: string; order_index: number; question_text: string }[] }
 
+type BulkItem = {
+  fileName: string
+  status: 'pending' | 'done' | 'error'
+  error?: string
+  question_text: string
+  question_type: QuestionType
+  options: string[]
+  correct_indices: number[]
+  explanation: string
+  topic: string
+}
+
 export default function QuestionsPage() {
   const [banks, setBanks] = useState<QuestionBank[]>([])
   const [selectedBank, setSelectedBank] = useState('')
@@ -45,6 +57,12 @@ export default function QuestionsPage() {
   const [extracting, setExtracting] = useState(false)
   const [extractNote, setExtractNote] = useState('')
   const screenshotInputRef = useRef<HTMLInputElement>(null)
+
+  // Bulk screenshot import state
+  const [bulkItems, setBulkItems] = useState<BulkItem[] | null>(null)
+  const [bulkProcessing, setBulkProcessing] = useState(false)
+  const [bulkImporting, setBulkImporting] = useState(false)
+  const bulkInputRef = useRef<HTMLInputElement>(null)
 
   // Form state
   const [qType, setQType] = useState<QuestionType>('single')
@@ -297,6 +315,103 @@ export default function QuestionsPage() {
     }
   }
 
+  async function fileToBase64(file: File): Promise<string> {
+    const dataUrl: string = await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result))
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+    return dataUrl.split(',')[1]
+  }
+
+  async function handleBulkSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || [])
+    e.target.value = ''
+    if (files.length === 0) return
+
+    const items: BulkItem[] = files.map(f => ({
+      fileName: f.name, status: 'pending',
+      question_text: '', question_type: 'single', options: [], correct_indices: [], explanation: '', topic: '',
+    }))
+    setBulkItems(items)
+    setBulkProcessing(true)
+
+    // Process sequentially to stay within API rate limits
+    for (let i = 0; i < files.length; i++) {
+      try {
+        const base64 = await fileToBase64(files[i])
+        const res = await fetch('/api/extract-question', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: base64, mediaType: files[i].type }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Extract failed')
+        setBulkItems(prev => prev && prev.map((it, idx) => idx === i ? {
+          ...it, status: 'done',
+          question_text: data.question_text || '',
+          question_type: (data.question_type as QuestionType) || 'single',
+          options: Array.isArray(data.options) ? data.options : [],
+          correct_indices: Array.isArray(data.correct_indices) ? data.correct_indices : [],
+          explanation: data.explanation || '',
+          topic: data.topic || 'General',
+        } : it))
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Failed'
+        setBulkItems(prev => prev && prev.map((it, idx) => idx === i ? { ...it, status: 'error', error: msg } : it))
+      }
+    }
+    setBulkProcessing(false)
+  }
+
+  function toggleBulkCorrect(itemIdx: number, optIdx: number) {
+    setBulkItems(prev => prev && prev.map((it, idx) => {
+      if (idx !== itemIdx) return it
+      const single = it.question_type === 'single' || it.question_type === 'truefalse'
+      const has = it.correct_indices.includes(optIdx)
+      const next = single ? [optIdx] : has ? it.correct_indices.filter(x => x !== optIdx) : [...it.correct_indices, optIdx]
+      return { ...it, correct_indices: next.sort((a, b) => a - b) }
+    }))
+  }
+
+  const bulkValid = (it: BulkItem) =>
+    it.status === 'done' && it.question_text.trim() !== '' &&
+    (it.question_type === 'truefalse' ? it.options.length === 2 : it.options.length >= 2) &&
+    it.correct_indices.length > 0
+
+  async function confirmBulkImport() {
+    if (!bulkItems) return
+    const valid = bulkItems.filter(bulkValid)
+    if (valid.length === 0) return
+    setBulkImporting(true)
+
+    const { data: existing } = await supabase.from('questions')
+      .select('order_index').eq('bank_id', selectedBank).order('order_index', { ascending: false }).limit(1)
+    let nextIndex = existing && existing.length > 0 ? existing[0].order_index + 1 : 1
+
+    const payload = valid.map(it => ({
+      bank_id: selectedBank,
+      question_text: it.question_text.trim(),
+      question_type: it.question_type,
+      options: it.question_type === 'truefalse' ? ['True', 'False'] : it.options,
+      correct_indices: it.correct_indices,
+      explanation: it.explanation,
+      topic: it.topic || 'General',
+      order_index: nextIndex++,
+    }))
+
+    const { error: err } = await supabase.from('questions').insert(payload)
+    if (err) {
+      setError(err.message)
+    } else {
+      setBanks(prev => prev.map(b => b.id === selectedBank ? { ...b, question_count: b.question_count + valid.length } : b))
+      setBulkItems(null)
+      loadQuestions(true)
+    }
+    setBulkImporting(false)
+  }
+
   function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -465,7 +580,15 @@ export default function QuestionsPage() {
                 >
                   ⬆ CSV
                 </button>
+                <button
+                  onClick={() => bulkInputRef.current?.click()}
+                  className="px-4 border border-brand-600 text-brand-600 font-medium rounded-xl active:scale-95"
+                  title="Bulk import from screenshots (AI)"
+                >
+                  📷
+                </button>
                 <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleFileSelected} />
+                <input ref={bulkInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleBulkSelect} />
               </div>
             )}
             {!showForm && (
@@ -808,6 +931,82 @@ export default function QuestionsPage() {
         >
           +
         </button>
+      )}
+
+      {/* Bulk screenshot import */}
+      {bulkItems && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex flex-col justify-end" onClick={() => !bulkProcessing && !bulkImporting && setBulkItems(null)}>
+          <div className="bg-white rounded-t-3xl max-h-[90vh] w-full flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-shrink-0">
+              <div>
+                <h2 className="font-semibold text-gray-800">Screenshot import</h2>
+                <p className="text-xs text-gray-400">
+                  {bulkProcessing
+                    ? `Reading ${bulkItems.filter(i => i.status !== 'pending').length}/${bulkItems.length}…`
+                    : `${bulkItems.filter(bulkValid).length} ready · ${bulkItems.length} total`}
+                </p>
+              </div>
+              <button onClick={() => !bulkProcessing && !bulkImporting && setBulkItems(null)} className="text-gray-400 text-2xl leading-none">×</button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+              {bulkProcessing && (
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mb-2">
+                  <div className="h-full bg-brand-600 transition-all"
+                    style={{ width: `${(bulkItems.filter(i => i.status !== 'pending').length / bulkItems.length) * 100}%` }} />
+                </div>
+              )}
+              {bulkItems.map((it, i) => {
+                const tf = it.question_type === 'truefalse'
+                const opts = tf ? ['True', 'False'] : it.options
+                const valid = bulkValid(it)
+                return (
+                  <div key={i} className={`rounded-xl border px-3 py-2 ${
+                    it.status === 'error' ? 'border-red-200 bg-red-50' :
+                    it.status === 'pending' ? 'border-gray-100 opacity-60' :
+                    valid ? 'border-gray-100' : 'border-amber-200 bg-amber-50'
+                  }`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs text-gray-400 truncate flex-1">{it.fileName}</span>
+                      {it.status === 'pending' && <span className="text-xs text-gray-400">⏳</span>}
+                      {it.status === 'error' && <span className="text-xs text-red-500">⚠ {it.error}</span>}
+                      {it.status === 'done' && !valid && <span className="text-xs text-amber-600">needs answer</span>}
+                      {it.status === 'done' && valid && <span className="text-xs text-green-600">✓ ready</span>}
+                    </div>
+                    {it.status === 'done' && (
+                      <>
+                        <p className="text-sm text-gray-800 line-clamp-2 mb-1.5">{it.question_text || <span className="italic text-gray-400">(no text)</span>}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {opts.map((opt, oi) => (
+                            <button key={oi} onClick={() => toggleBulkCorrect(i, oi)}
+                              className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition-all ${
+                                it.correct_indices.includes(oi) ? 'bg-green-500 border-green-500 text-white' : 'border-gray-200 text-gray-600'
+                              }`}>
+                              <span className="font-bold">{tf ? (oi === 0 ? 'T' : 'F') : OPTION_LABELS[oi]}</span>
+                              <span className="max-w-[160px] truncate">{opt}</span>
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-[11px] text-gray-400 mt-1">Tap the correct answer{it.question_type === 'multiple' ? '(s)' : ''} to set/confirm it.</p>
+                      </>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="flex gap-2 px-4 py-3 border-t border-gray-100 flex-shrink-0">
+              <button onClick={confirmBulkImport} disabled={bulkProcessing || bulkImporting || bulkItems.filter(bulkValid).length === 0}
+                className="flex-1 bg-brand-600 text-white font-medium py-3 rounded-xl active:scale-95 disabled:opacity-50">
+                {bulkImporting ? 'Importing…' : bulkProcessing ? 'Reading…' : `Import ${bulkItems.filter(bulkValid).length} question${bulkItems.filter(bulkValid).length !== 1 ? 's' : ''}`}
+              </button>
+              <button onClick={() => setBulkItems(null)} disabled={bulkProcessing || bulkImporting}
+                className="px-5 border border-gray-300 text-gray-600 font-medium py-3 rounded-xl active:scale-95 disabled:opacity-50">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Duplicate warning */}
