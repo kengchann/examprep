@@ -17,6 +17,8 @@ type DupGroup = { text: string; items: { id: string; order_index: number; questi
 
 type BulkItem = {
   fileName: string
+  qNum: number | null          // question number parsed from the filename
+  answerFromFile: boolean       // true if the correct answer came from the filename
   status: 'pending' | 'done' | 'error'
   error?: string
   question_text: string
@@ -25,6 +27,23 @@ type BulkItem = {
   correct_indices: number[]
   explanation: string
   topic: string
+}
+
+// Parse a filename like "124bc" → { num: 124, answer: [1,2] } (a=0,b=1,…).
+// Tolerates separators/extension: "124 bc.png", "124_b-c", "124".
+function parseFilenameMeta(name: string): { num: number | null; answer: number[] | null } {
+  const base = name.replace(/\.[^.]+$/, '').trim()
+  const m = base.match(/^(\d+)[\s._-]*([a-hA-H]*)$/)
+  if (!m) {
+    const numOnly = base.match(/^(\d+)/)
+    return { num: numOnly ? parseInt(numOnly[1], 10) : null, answer: null }
+  }
+  const num = parseInt(m[1], 10)
+  const letters = m[2].toLowerCase()
+  const answer = letters
+    ? Array.from(new Set(letters.split('').map(c => c.charCodeAt(0) - 97))).sort((a, b) => a - b)
+    : null
+  return { num, answer }
 }
 
 export default function QuestionsPage() {
@@ -330,32 +349,56 @@ export default function QuestionsPage() {
     e.target.value = ''
     if (files.length === 0) return
 
-    const items: BulkItem[] = files.map(f => ({
-      fileName: f.name, status: 'pending',
+    // Sort by the number in the filename so they import in the right order (121 before 1199)
+    const withMeta = files.map(f => ({ file: f, meta: parseFilenameMeta(f.name) }))
+    withMeta.sort((a, b) => {
+      if (a.meta.num != null && b.meta.num != null) return a.meta.num - b.meta.num
+      if (a.meta.num != null) return -1
+      if (b.meta.num != null) return 1
+      return a.file.name.localeCompare(b.file.name)
+    })
+
+    const items: BulkItem[] = withMeta.map(({ file, meta }) => ({
+      fileName: file.name, qNum: meta.num, answerFromFile: false, status: 'pending',
       question_text: '', question_type: 'single', options: [], correct_indices: [], explanation: '', topic: '',
     }))
     setBulkItems(items)
     setBulkProcessing(true)
 
     // Process sequentially to stay within API rate limits
-    for (let i = 0; i < files.length; i++) {
+    for (let i = 0; i < withMeta.length; i++) {
+      const { file, meta } = withMeta[i]
       try {
-        const base64 = await fileToBase64(files[i])
+        const base64 = await fileToBase64(file)
         const res = await fetch('/api/extract-question', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: base64, mediaType: files[i].type }),
+          body: JSON.stringify({ image: base64, mediaType: file.type }),
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Extract failed')
+
+        const aiType = (data.question_type as QuestionType) || 'single'
+        // Filename answer (e.g. "124bc") wins over the AI's guess when present
+        let qtype = aiType
+        let correct = Array.isArray(data.correct_indices) ? data.correct_indices : []
+        let answerFromFile = false
+        if (meta.answer && meta.answer.length > 0) {
+          correct = meta.answer
+          answerFromFile = true
+          if (meta.answer.length > 1) qtype = 'multiple'
+          else if (aiType !== 'truefalse') qtype = 'single'
+        }
+
         setBulkItems(prev => prev && prev.map((it, idx) => idx === i ? {
           ...it, status: 'done',
           question_text: data.question_text || '',
-          question_type: (data.question_type as QuestionType) || 'single',
+          question_type: qtype,
           options: Array.isArray(data.options) ? data.options : [],
-          correct_indices: Array.isArray(data.correct_indices) ? data.correct_indices : [],
+          correct_indices: correct,
           explanation: data.explanation || '',
           topic: data.topic || 'General',
+          answerFromFile,
         } : it))
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed'
@@ -375,10 +418,13 @@ export default function QuestionsPage() {
     }))
   }
 
-  const bulkValid = (it: BulkItem) =>
-    it.status === 'done' && it.question_text.trim() !== '' &&
-    (it.question_type === 'truefalse' ? it.options.length === 2 : it.options.length >= 2) &&
-    it.correct_indices.length > 0
+  const bulkValid = (it: BulkItem) => {
+    if (it.status !== 'done' || it.question_text.trim() === '') return false
+    const optCount = it.question_type === 'truefalse' ? 2 : it.options.length
+    if (optCount < 2) return false
+    if (it.correct_indices.length === 0) return false
+    return it.correct_indices.every(ci => ci >= 0 && ci < optCount)   // answer must point to a real option
+  }
 
   async function confirmBulkImport() {
     if (!bulkItems) return
@@ -390,6 +436,7 @@ export default function QuestionsPage() {
       .select('order_index').eq('bank_id', selectedBank).order('order_index', { ascending: false }).limit(1)
     let nextIndex = existing && existing.length > 0 ? existing[0].order_index + 1 : 1
 
+    // Use the number from the filename as the question position when present; otherwise continue sequentially
     const payload = valid.map(it => ({
       bank_id: selectedBank,
       question_text: it.question_text.trim(),
@@ -398,7 +445,7 @@ export default function QuestionsPage() {
       correct_indices: it.correct_indices,
       explanation: it.explanation,
       topic: it.topic || 'General',
-      order_index: nextIndex++,
+      order_index: it.qNum != null ? it.qNum : nextIndex++,
     }))
 
     const { error: err } = await supabase.from('questions').insert(payload)
@@ -967,11 +1014,14 @@ export default function QuestionsPage() {
                     valid ? 'border-gray-100' : 'border-amber-200 bg-amber-50'
                   }`}>
                     <div className="flex items-center gap-2 mb-1">
+                      {it.qNum != null && <span className="text-xs font-bold text-brand-600 flex-shrink-0">Q{it.qNum}</span>}
                       <span className="text-xs text-gray-400 truncate flex-1">{it.fileName}</span>
                       {it.status === 'pending' && <span className="text-xs text-gray-400">⏳</span>}
                       {it.status === 'error' && <span className="text-xs text-red-500">⚠ {it.error}</span>}
                       {it.status === 'done' && !valid && <span className="text-xs text-amber-600">needs answer</span>}
-                      {it.status === 'done' && valid && <span className="text-xs text-green-600">✓ ready</span>}
+                      {it.status === 'done' && valid && (
+                        <span className="text-xs text-green-600">✓ {it.answerFromFile ? 'from filename' : 'ready'}</span>
+                      )}
                     </div>
                     {it.status === 'done' && (
                       <>
