@@ -21,3 +21,7 @@ next-env.d.ts
 .DS_Store
 *.pem
 npm-debug.log*
+
+# exam source files (large, not part of the app)
+*.vce
+*.pdf
