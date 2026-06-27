@@ -46,6 +46,7 @@ export type Attempt = {
   correct: number
   total: number
   elapsed_seconds: number
+  details: AttemptResult[] | null   // full per-question results, for review
   created_at: string
 }
 

@@ -301,6 +301,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
       supabase.from('attempts').insert({
         user_id: user.id, bank_id: bankId || null, bank_name: bankName, mode,
         score: attempt.score, correct: attempt.correct, total: attempt.total, elapsed_seconds: elapsed,
+        details: results,   // full per-question results so it can be reviewed later
       })
     })
 

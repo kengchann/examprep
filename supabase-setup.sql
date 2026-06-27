@@ -234,6 +234,9 @@ CREATE POLICY "Read questions of assigned or open banks" ON questions FOR SELECT
   )
 );
 
+-- v2.4 — store full per-question results so students can review past attempts
+ALTER TABLE attempts ADD COLUMN IF NOT EXISTS details JSONB;
+
 -- ============================================
 -- 👑 MAKE YOURSELF ADMIN
 -- Replace the email with the one you log into the app with, then run this line:
