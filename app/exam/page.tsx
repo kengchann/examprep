@@ -151,6 +151,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
   const [secondsLeft, setSecondsLeft] = useState(timeLimit ? timeLimit * 60 : null)
   const [elapsed, setElapsed] = useState(0)
   const [showTimeWarning, setShowTimeWarning] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const questionStartRef = useRef(Date.now())
   const warnedRef = useRef(false)
@@ -266,7 +267,9 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
     questionStartRef.current = Date.now()
   }
 
-  function submitExam() {
+  async function submitExam() {
+    if (submitting) return
+    setSubmitting(true)
     if (timerRef.current) clearInterval(timerRef.current)
     const results = questions.map((q, i) => {
       const a = answers[i]
@@ -295,19 +298,26 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
     localStorage.setItem('examprep_history', JSON.stringify([attempt, ...history].slice(0, 50)))
     localStorage.removeItem(SESSION_KEY)
 
-    // Record the attempt server-side so admins can see student activity (fire-and-forget)
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
-      supabase.from('attempts').insert({
-        user_id: user.id, bank_id: bankId || null, bank_name: bankName, mode,
-        score: attempt.score, correct: attempt.correct, total: attempt.total, elapsed_seconds: elapsed,
-        details: results,   // full per-question results so it can be reviewed later
-      })
-    })
-
     // Hand the (potentially large) results to the results page via sessionStorage
     // instead of the URL — a long URL triggers a 414 URI_TOO_LONG error.
     sessionStorage.setItem('examprep_results', JSON.stringify(results))
+
+    // Save the attempt to the cloud BEFORE navigating, so the page change can't
+    // abort the request. Surface errors instead of swallowing them.
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { error } = await supabase.from('attempts').insert({
+          user_id: user.id, bank_id: bankId || null, bank_name: bankName, mode,
+          score: attempt.score, correct: attempt.correct, total: attempt.total, elapsed_seconds: elapsed,
+          details: results,   // full per-question results so it can be reviewed later
+        })
+        if (error) console.error('Could not save attempt:', error.message)
+      }
+    } catch (e) {
+      console.error('Could not save attempt:', e)
+    }
+
     const params = new URLSearchParams({ bankName, mode, elapsed: elapsed.toString() })
     router.push(`/results?${params}`)
   }
@@ -449,8 +459,8 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
               Confirm answer
             </button>
           ) : (
-            <button onClick={next} className="btn-primary">
-              {current < questions.length - 1 ? 'Next question →' : '📊 See results →'}
+            <button onClick={next} disabled={submitting} className="btn-primary disabled:opacity-50">
+              {current < questions.length - 1 ? 'Next question →' : submitting ? 'Submitting…' : '📊 See results →'}
             </button>
           )}
           {/* Back / Skip row — Previous lets you revisit earlier questions in learning mode */}
@@ -503,8 +513,8 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
               })}
             </div>
             <div className="mt-4 pt-4 border-t border-gray-100">
-              <button onClick={submitExam} className="btn-danger">
-                Submit exam ({answeredCount}/{questions.length} answered)
+              <button onClick={submitExam} disabled={submitting} className="btn-danger disabled:opacity-50">
+                {submitting ? 'Submitting…' : `Submit exam (${answeredCount}/${questions.length} answered)`}
               </button>
             </div>
           </div>
