@@ -1,6 +1,6 @@
 'use client'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import type { AttemptResult } from '@/lib/types'
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
@@ -14,8 +14,17 @@ function ResultsContent() {
   const [tab, setTab] = useState<'summary' | 'review' | 'topics'>('summary')
   const [showFlagged, setShowFlagged] = useState(false)
 
-  let results: AttemptResult[] = []
-  try { results = JSON.parse(params.get('results') || '[]') } catch {}
+  // Results are passed via sessionStorage (too large for the URL). Fall back to
+  // the legacy ?results= query param if present, for older links.
+  const [results, setResults] = useState<AttemptResult[]>([])
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem('examprep_results')
+      if (stored) { setResults(JSON.parse(stored)); return }
+      const fromUrl = params.get('results')
+      if (fromUrl) setResults(JSON.parse(fromUrl))
+    } catch {}
+  }, [params])
 
   const total = results.length
   const correct = results.filter(r => r.correct).length

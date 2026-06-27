@@ -301,7 +301,10 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
       })
     })
 
-    const params = new URLSearchParams({ results: JSON.stringify(results), bankName, mode, elapsed: elapsed.toString() })
+    // Hand the (potentially large) results to the results page via sessionStorage
+    // instead of the URL — a long URL triggers a 414 URI_TOO_LONG error.
+    sessionStorage.setItem('examprep_results', JSON.stringify(results))
+    const params = new URLSearchParams({ bankName, mode, elapsed: elapsed.toString() })
     router.push(`/results?${params}`)
   }
 
