@@ -24,7 +24,13 @@ export default function BanksPage() {
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
     if (profile?.role !== 'admin') { router.replace('/dashboard'); return }
     const { data } = await supabase.from('question_banks').select('*').order('created_at', { ascending: false })
-    setBanks(data || [])
+    // Use the REAL question counts (the stored question_count column can drift).
+    const { data: counts } = await supabase.from('questions').select('bank_id')
+    const countMap: Record<string, number> = {}
+    for (const row of counts ?? []) {
+      countMap[row.bank_id] = (countMap[row.bank_id] ?? 0) + 1
+    }
+    setBanks((data || []).map(b => ({ ...b, question_count: countMap[b.id] ?? 0 })))
     setLoading(false)
   }
 

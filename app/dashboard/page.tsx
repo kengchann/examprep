@@ -33,7 +33,15 @@ export default function Dashboard() {
       supabase.rpc('touch_last_active')   // record activity (fire-and-forget)
       const { data } = await supabase.from('question_banks')
         .select('*').order('created_at', { ascending: false })
-      setBanks(data || [])
+      // Use the REAL number of questions in each bank, not the stored
+      // question_count column (which can drift out of sync after bulk imports).
+      const { data: counts } = await supabase.from('questions').select('bank_id')
+      const countMap: Record<string, number> = {}
+      for (const row of counts ?? []) {
+        countMap[row.bank_id] = (countMap[row.bank_id] ?? 0) + 1
+      }
+      const banksWithCount = (data || []).map(b => ({ ...b, question_count: countMap[b.id] ?? 0 }))
+      setBanks(banksWithCount)
       setLoading(false)
     }
     load()
