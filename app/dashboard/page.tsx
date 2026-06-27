@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import BottomNav from '@/components/BottomNav'
 import Link from 'next/link'
 import { useUserRole } from '@/lib/useUserRole'
+import { useSettings } from '@/lib/settings'
 import type { QuestionBank, ExamMode } from '@/lib/types'
 
 const categoryIcon: Record<string, string> = { IT: '💻', Academic: '📖', Other: '📝' }
@@ -22,8 +23,14 @@ export default function Dashboard() {
   const [selectedBank, setSelectedBank] = useState<QuestionBank | null>(null)
   const [selectedMode, setSelectedMode] = useState<ExamMode>('practice')
   const { isAdmin } = useUserRole()
+  const { settings } = useSettings()
   const router = useRouter()
   const supabase = createClient()
+
+  // Honor the user's preferred default exam mode (Settings).
+  useEffect(() => {
+    if (settings.defaultMode !== 'ask') setSelectedMode(settings.defaultMode)
+  }, [settings.defaultMode])
 
   useEffect(() => {
     async function load() {

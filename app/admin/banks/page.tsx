@@ -1,9 +1,11 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import BottomNav from '@/components/BottomNav'
 import type { QuestionBank } from '@/lib/types'
+
+const BACKUP_VERSION = 1
 
 export default function BanksPage() {
   const [banks, setBanks] = useState<QuestionBank[]>([])
@@ -14,6 +16,10 @@ export default function BanksPage() {
   const [category, setCategory] = useState('IT')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [busyBank, setBusyBank] = useState<string | null>(null)   // bank id being exported
+  const [restoreMsg, setRestoreMsg] = useState('')
+  const [restoring, setRestoring] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -60,6 +66,84 @@ export default function BanksPage() {
     await supabase.from('question_banks').update({ is_open: next }).eq('id', bank.id)
   }
 
+  // Download a full-fidelity JSON backup of one bank (bank info + all questions).
+  async function exportBank(bank: QuestionBank) {
+    setBusyBank(bank.id); setRestoreMsg('')
+    const { data, error: err } = await supabase
+      .from('questions')
+      .select('question_text, question_type, options, correct_indices, explanation, topic, image_url, order_index')
+      .eq('bank_id', bank.id)
+      .order('order_index', { ascending: true })
+    setBusyBank(null)
+    if (err) { setRestoreMsg(`Export failed: ${err.message}`); return }
+    const backup = {
+      version: BACKUP_VERSION,
+      exported_at: new Date().toISOString(),
+      bank: { name: bank.name, description: bank.description, category: bank.category, is_open: bank.is_open },
+      questions: data ?? [],
+    }
+    const safeName = bank.name.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '') || 'bank'
+    const stamp = new Date().toISOString().slice(0, 10)
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${safeName}-backup-${stamp}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Restore a backup file into a brand-new bank (never overwrites an existing one).
+  async function restoreBank(file: File) {
+    setRestoring(true); setRestoreMsg('')
+    try {
+      const backup = JSON.parse(await file.text())
+      const meta = backup?.bank
+      const questions = backup?.questions
+      if (!meta?.name || !Array.isArray(questions)) {
+        throw new Error('This file is not a valid ExamPrep bank backup.')
+      }
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: newBank, error: bankErr } = await supabase
+        .from('question_banks')
+        .insert({
+          name: `${meta.name} (restored)`,
+          description: meta.description || '',
+          category: meta.category || 'Other',
+          is_open: !!meta.is_open,
+          created_by: user?.id,
+          question_count: 0,
+        })
+        .select('id')
+        .single()
+      if (bankErr || !newBank) throw new Error(bankErr?.message || 'Could not create the bank.')
+
+      const rows = questions.map((q: any, i: number) => ({
+        bank_id: newBank.id,
+        question_text: q.question_text ?? '',
+        question_type: q.question_type ?? 'single',
+        options: q.options ?? [],
+        correct_indices: q.correct_indices ?? [],
+        explanation: q.explanation ?? '',
+        topic: q.topic ?? 'General',
+        image_url: q.image_url ?? null,
+        order_index: q.order_index ?? i + 1,
+      }))
+      // Insert in chunks so large banks don't hit request-size limits.
+      for (let i = 0; i < rows.length; i += 500) {
+        const { error: qErr } = await supabase.from('questions').insert(rows.slice(i, i + 500))
+        if (qErr) throw new Error(`Imported the bank but a batch of questions failed: ${qErr.message}`)
+      }
+      setRestoreMsg(`✅ Restored "${meta.name}" with ${rows.length} question${rows.length !== 1 ? 's' : ''}.`)
+      load()
+    } catch (e) {
+      setRestoreMsg(`❌ ${e instanceof Error ? e.message : 'Restore failed.'}`)
+    } finally {
+      setRestoring(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       <div className="bg-brand-600 px-4 pt-12 pb-5">
@@ -68,7 +152,18 @@ export default function BanksPage() {
       </div>
 
       <div className="px-4 pt-5">
-        {!showForm && <button onClick={() => setShowForm(true)} className="btn-primary mb-4">+ Create new bank</button>}
+        {!showForm && (
+          <div className="flex gap-2 mb-4">
+            <button onClick={() => setShowForm(true)} className="btn-primary flex-1 mb-0">+ Create new bank</button>
+            <button onClick={() => fileInputRef.current?.click()} disabled={restoring}
+              className="border border-brand-600 text-brand-600 font-medium px-4 rounded-xl active:scale-95 disabled:opacity-50 whitespace-nowrap">
+              {restoring ? 'Restoring…' : '⬆ Restore'}
+            </button>
+            <input ref={fileInputRef} type="file" accept="application/json,.json" className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) restoreBank(f) }} />
+          </div>
+        )}
+        {restoreMsg && <p className="text-sm mb-4 text-gray-600 break-words">{restoreMsg}</p>}
 
         {showForm && (
           <form onSubmit={handleCreate} className="card mb-4 space-y-3">
@@ -118,7 +213,13 @@ export default function BanksPage() {
                       <span className="text-xs text-gray-400">{bank.question_count} questions</span>
                     </div>
                   </div>
-                  <button onClick={() => handleDelete(bank.id)} className="text-red-400 px-2 py-1 active:scale-95 ml-2">🗑</button>
+                  <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                    <button onClick={() => exportBank(bank)} disabled={busyBank === bank.id}
+                      className="text-xs text-brand-600 border border-brand-200 px-2 py-1 rounded-lg active:scale-95 disabled:opacity-50 whitespace-nowrap">
+                      {busyBank === bank.id ? '…' : '⬇ Backup'}
+                    </button>
+                    <button onClick={() => handleDelete(bank.id)} className="text-red-400 px-2 py-1 active:scale-95">🗑</button>
+                  </div>
                 </div>
                 <label className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-50 cursor-pointer">
                   <div>

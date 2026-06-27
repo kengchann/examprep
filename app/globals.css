@@ -32,3 +32,41 @@
     @apply text-xs font-medium px-2 py-0.5 rounded-full;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Dark mode. Rather than tag every element with `dark:` variants, we flip the
+   neutral (gray/white) palette in one place. `.dark .text-gray-700` (specificity
+   0,2,0) overrides the base `.text-gray-700` (0,1,0), so every screen darkens at
+   once. Brand/green/red/amber colors are intentionally left untouched.
+--------------------------------------------------------------------------- */
+.dark body { background-color: #0f172a; color: #f3f4f6; }
+
+/* Surfaces */
+.dark .bg-white      { background-color: #1e293b; }
+.dark .bg-gray-50    { background-color: #0f172a; }
+.dark .bg-gray-100   { background-color: #334155; }
+.dark .bg-gray-200   { background-color: #334155; }
+.dark .bg-brand-50   { background-color: #2a2550; }
+
+/* Borders */
+.dark .border-gray-50,
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-gray-300 { border-color: #334155; }
+
+/* Text */
+.dark .text-gray-900,
+.dark .text-gray-800 { color: #f8fafc; }
+.dark .text-gray-700 { color: #e2e8f0; }
+.dark .text-gray-600 { color: #cbd5e1; }
+.dark .text-gray-500 { color: #94a3b8; }
+.dark .text-gray-400 { color: #8b97a9; }
+
+/* Component classes use @apply, so the palette overrides above don't reach
+   them — restyle them explicitly. */
+.dark .card        { background-color: #1e293b; border-color: #334155; }
+.dark .input-field { background-color: #1e293b; border-color: #334155; color: #f8fafc; }
+.dark .input-field::placeholder { color: #64748b; }
+
+/* Font-size preference: scales every rem-based size at once. */
+html.text-large { font-size: 18px; }

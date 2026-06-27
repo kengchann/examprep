@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useSettings, tapFeedback } from '@/lib/settings'
 import type { Question, ExamMode, ExamAnswer } from '@/lib/types'
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
@@ -139,6 +140,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
 }) {
   const router = useRouter()
   const supabase = createClient()
+  const { settings } = useSettings()
   const [current, setCurrent] = useState(0)
   const [answers, setAnswers] = useState<ExamAnswer[]>(() =>
     questions.map(q => ({ questionId: q.id, selectedIndices: [], flagged: false, skipped: false, timeSpent: 0 }))
@@ -189,6 +191,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
   function toggleSelect(i: number) {
     if (confirmed && !isLearning) return
     if (isLearning && confirmed) return
+    tapFeedback(settings.feedback)
     setAnswers(prev => {
       const updated = [...prev]
       const cur = { ...updated[current] }
@@ -367,7 +370,9 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
             {current + 1}/{questions.length}
             {flaggedCount > 0 && <span className="ml-1 text-amber-500">🚩{flaggedCount}</span>}
           </button>
-          {secondsLeft !== null ? (
+          {settings.hideTimer ? (
+            <span className="w-12" />
+          ) : secondsLeft !== null ? (
             <span className={`text-sm font-bold ${lowTime ? 'text-red-500 animate-pulse' : 'text-gray-600'}`}>
               ⏱ {formatTime(secondsLeft)}
             </span>
@@ -386,7 +391,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
       </div>
 
       {/* 5-minute warning banner */}
-      {showTimeWarning && (
+      {showTimeWarning && !settings.hideTimer && (
         <div className="sticky top-0 z-20 bg-red-500 text-white text-center text-sm font-semibold py-2 px-4 animate-pulse">
           ⚠️ Less than 5 minutes remaining!
         </div>
