@@ -6,6 +6,7 @@ import BottomNav from '@/components/BottomNav'
 import Link from 'next/link'
 import { useUserRole } from '@/lib/useUserRole'
 import { useSettings } from '@/lib/settings'
+import { readSession, clearSession } from '@/lib/session'
 import type { QuestionBank, ExamMode } from '@/lib/types'
 
 const categoryIcon: Record<string, string> = { IT: '💻', Academic: '📖', Other: '📝' }
@@ -24,6 +25,7 @@ export default function Dashboard() {
   const [selectedMode, setSelectedMode] = useState<ExamMode>('practice')
   const { isAdmin } = useUserRole()
   const { settings } = useSettings()
+  const [resume, setResume] = useState<{ bankId: string; bankName: string; mode: ExamMode; answered: number; total: number } | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -31,6 +33,30 @@ export default function Dashboard() {
   useEffect(() => {
     if (settings.defaultMode !== 'ask') setSelectedMode(settings.defaultMode)
   }, [settings.defaultMode])
+
+  // Detect an in-progress exam that can be resumed.
+  useEffect(() => {
+    const saved = readSession()
+    if (saved) {
+      const answered = saved.state.answers.filter(a => a.selectedIndices.length > 0 || a.skipped).length
+      setResume({
+        bankId: saved.meta.bankId, bankName: saved.meta.bankName, mode: saved.meta.mode,
+        answered, total: saved.meta.questions.length,
+      })
+    }
+  }, [])
+
+  function resumeExam() {
+    if (!resume) return
+    const params = new URLSearchParams({ bank: resume.bankId, bankName: resume.bankName, mode: resume.mode, resume: '1' })
+    router.push(`/exam?${params}`)
+  }
+
+  function discardResume() {
+    if (!confirm('Discard your in-progress exam? This cannot be undone.')) return
+    clearSession()
+    setResume(null)
+  }
 
   useEffect(() => {
     async function load() {
@@ -87,6 +113,27 @@ export default function Dashboard() {
       </div>
 
       <div className="px-4 pt-5 space-y-5">
+        {/* Resume in-progress exam */}
+        {resume && (
+          <div className="card border-brand-200 bg-brand-50">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">⏸️</span>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-900 text-sm">Resume your exam</p>
+                <p className="text-xs text-gray-500 truncate">{resume.bankName} · {resume.answered}/{resume.total} answered</p>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-3">
+              <button onClick={resumeExam} className="flex-1 bg-brand-600 text-white text-sm font-medium py-2.5 rounded-xl active:scale-95">
+                ▶ Resume
+              </button>
+              <button onClick={discardResume} className="px-4 border border-gray-200 text-gray-500 text-sm font-medium py-2.5 rounded-xl active:scale-95">
+                Discard
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Bank picker */}
         <div>
           <h2 className="text-sm font-semibold text-gray-600 mb-2">1. Choose a question bank</h2>

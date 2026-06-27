@@ -3,10 +3,13 @@ import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSettings, tapFeedback } from '@/lib/settings'
+import {
+  SESSION_META_KEY, SESSION_STATE_KEY, readSession, clearSession,
+  type SessionMeta, type SessionState,
+} from '@/lib/session'
 import type { Question, ExamMode, ExamAnswer } from '@/lib/types'
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
-const SESSION_KEY = 'examprep_session'
 
 type CustomConfig = {
   from: number; to: number; timeLimit: number | null; shuffle: boolean
@@ -135,21 +138,25 @@ function ExamSetup({ questions, mode, onStart }: {
   return null
 }
 
-function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
+function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState }: {
   questions: Question[]; mode: ExamMode; bankId: string; bankName: string; timeLimit: number | null
+  resumeState?: SessionState | null
 }) {
   const router = useRouter()
   const supabase = createClient()
   const { settings } = useSettings()
-  const [current, setCurrent] = useState(0)
+  const [current, setCurrent] = useState(resumeState?.current ?? 0)
   const [answers, setAnswers] = useState<ExamAnswer[]>(() =>
+    resumeState?.answers ??
     questions.map(q => ({ questionId: q.id, selectedIndices: [], flagged: false, skipped: false, timeSpent: 0 }))
   )
   const [confirmed, setConfirmed] = useState(false)
   const [paused, setPaused] = useState(false)
   const [showNav, setShowNav] = useState(false)
-  const [secondsLeft, setSecondsLeft] = useState(timeLimit ? timeLimit * 60 : null)
-  const [elapsed, setElapsed] = useState(0)
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(
+    resumeState ? resumeState.secondsLeft : (timeLimit ? timeLimit * 60 : null)
+  )
+  const [elapsed, setElapsed] = useState(resumeState?.elapsed ?? 0)
   const [showTimeWarning, setShowTimeWarning] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -160,6 +167,39 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
   const answer = answers[current]
   const isMultiple = q.question_type === 'multiple'
   const isLearning = mode === 'learning'
+
+  // --- Save the in-progress exam so it survives a refresh / disconnect ---
+  // Write the static META once. (resumeState means it's already stored.)
+  useEffect(() => {
+    if (resumeState) return
+    try {
+      const meta: SessionMeta = { bankId, bankName, mode, timeLimit, questions }
+      localStorage.setItem(SESSION_META_KEY, JSON.stringify(meta))
+    } catch {}
+  }, [])
+
+  // Keep the latest dynamic state in a ref so listeners/intervals save fresh data.
+  const stateRef = useRef<SessionState>({ answers, current, elapsed, secondsLeft, savedAt: Date.now() })
+  stateRef.current = { answers, current, elapsed, secondsLeft, savedAt: Date.now() }
+  const submittedRef = useRef(false)
+  function saveState() {
+    if (submittedRef.current) return
+    try { localStorage.setItem(SESSION_STATE_KEY, JSON.stringify(stateRef.current)) } catch {}
+  }
+  // Save on answer/position changes, every few seconds (for the clock), and when
+  // the tab is hidden or closed (the most likely moment a connection drops).
+  useEffect(() => { saveState() }, [answers, current])
+  useEffect(() => {
+    const iv = setInterval(saveState, 5000)
+    const onHide = () => saveState()
+    document.addEventListener('visibilitychange', onHide)
+    window.addEventListener('pagehide', onHide)
+    return () => {
+      clearInterval(iv)
+      document.removeEventListener('visibilitychange', onHide)
+      window.removeEventListener('pagehide', onHide)
+    }
+  }, [])
 
   // Timer
   useEffect(() => {
@@ -270,6 +310,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
   async function submitExam() {
     if (submitting) return
     setSubmitting(true)
+    submittedRef.current = true
     if (timerRef.current) clearInterval(timerRef.current)
     const results = questions.map((q, i) => {
       const a = answers[i]
@@ -296,7 +337,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
     }
     const history = JSON.parse(localStorage.getItem('examprep_history') || '[]')
     localStorage.setItem('examprep_history', JSON.stringify([attempt, ...history].slice(0, 50)))
-    localStorage.removeItem(SESSION_KEY)
+    clearSession()   // exam is finished — drop the saved in-progress session
 
     // Hand the (potentially large) results to the results page via sessionStorage
     // instead of the URL — a long URL triggers a 414 URI_TOO_LONG error.
@@ -364,9 +405,13 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit }: {
         <button onClick={() => setPaused(false)} className="w-full max-w-xs bg-white text-brand-600 font-bold py-4 rounded-2xl active:scale-95 transition-all mb-3">
           Resume Exam
         </button>
-        <button onClick={submitExam} className="w-full max-w-xs border border-white/40 text-white font-medium py-3 rounded-2xl active:scale-95">
-          Submit & See Results
+        <button onClick={() => { saveState(); router.push('/dashboard') }} className="w-full max-w-xs border border-white/40 text-white font-medium py-3 rounded-2xl active:scale-95 mb-3">
+          Save &amp; Exit
         </button>
+        <button onClick={submitExam} className="w-full max-w-xs text-brand-200 text-sm py-2 active:scale-95">
+          Submit &amp; See Results
+        </button>
+        <p className="text-brand-200/70 text-xs mt-4 max-w-xs">Save &amp; Exit keeps your progress — resume anytime from the Home screen.</p>
       </div>
     )
   }
@@ -530,17 +575,34 @@ function ExamContent() {
   const [loading, setLoading] = useState(true)
   const [setupDone, setSetupDone] = useState(false)
   const [timeLimit, setTimeLimit] = useState<number | null>(null)
+  const [resumeState, setResumeState] = useState<SessionState | null>(null)
   const router = useRouter()
   const params = useSearchParams()
   const bankId = params.get('bank') || ''
   const bankName = params.get('bankName') || ''
   const mode = (params.get('mode') || 'practice') as ExamMode
+  const isResume = params.get('resume') === '1'
   const supabase = createClient()
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/auth'); return }
+
+      // Resume an in-progress exam from saved session — no refetch / setup needed.
+      if (isResume) {
+        const saved = readSession()
+        if (saved) {
+          setExamQuestions(saved.meta.questions)
+          setTimeLimit(saved.meta.timeLimit)
+          setResumeState(saved.state)
+          setSetupDone(true)
+          setLoading(false)
+          return
+        }
+        // Saved session gone — fall through to a normal fresh start.
+      }
+
       const { data } = await supabase.from('questions').select('*').eq('bank_id', bankId).order('order_index')
       if (!data || data.length === 0) { alert('No questions in this bank.'); router.push('/dashboard'); return }
       setAllQuestions(data as Question[])
@@ -570,7 +632,7 @@ function ExamContent() {
     )
   }
 
-  return <ExamRunner questions={examQuestions} mode={mode} bankId={bankId} bankName={bankName} timeLimit={timeLimit} />
+  return <ExamRunner questions={examQuestions} mode={mode} bankId={bankId} bankName={bankName} timeLimit={timeLimit} resumeState={resumeState} />
 }
 
 export default function ExamPage() {
