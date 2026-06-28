@@ -11,7 +11,7 @@ import { readDeck } from '@/lib/deck'
 import { fetchBookmarkIds, addBookmark, removeBookmark } from '@/lib/bookmarks'
 import { fetchHighlightMap, saveHighlights } from '@/lib/highlights'
 import KeywordText from '@/components/KeywordText'
-import TutorChat, { type TutorContext } from '@/components/TutorChat'
+import InsightCard, { type TutorContext } from '@/components/InsightCard'
 import type { Question, ExamMode, ExamAnswer } from '@/lib/types'
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
@@ -660,7 +660,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
               explanation: q.explanation,
             })}
             className="mt-3 text-sm font-medium text-brand-600 border border-brand-200 rounded-xl px-3 py-2 active:scale-95">
-            💬 Discuss with AI
+            💡 See why
           </button>
         )}
 
@@ -733,7 +733,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
         </div>
       )}
 
-      {tutor && <TutorChat context={tutor} onClose={() => setTutor(null)} />}
+      {tutor && <InsightCard context={tutor} onClose={() => setTutor(null)} />}
     </div>
   )
 }

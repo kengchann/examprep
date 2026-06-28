@@ -5,7 +5,7 @@ import { useSettings, tapFeedback } from '@/lib/settings'
 import { fetchBookmarkIds, addBookmark, removeBookmark } from '@/lib/bookmarks'
 import { fetchHighlightMap, saveHighlights } from '@/lib/highlights'
 import KeywordText from '@/components/KeywordText'
-import TutorChat, { type TutorContext } from '@/components/TutorChat'
+import InsightCard, { type TutorContext } from '@/components/InsightCard'
 import type { AttemptResult } from '@/lib/types'
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
@@ -290,7 +290,7 @@ function ResultsContent() {
                         explanation: r.explanation,
                       })}
                       className="text-xs font-medium text-brand-600 border border-brand-200 rounded-lg px-3 py-1.5 active:scale-95">
-                      💬 Discuss with AI
+                      💡 See why
                     </button>
                   </div>
                 </div>
@@ -300,7 +300,7 @@ function ResultsContent() {
         )}
       </div>
 
-      {tutor && <TutorChat context={tutor} onClose={() => setTutor(null)} />}
+      {tutor && <InsightCard context={tutor} onClose={() => setTutor(null)} />}
     </div>
   )
 }
