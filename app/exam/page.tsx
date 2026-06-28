@@ -42,21 +42,25 @@ function ExamSetup({ questions, mode, onStart }: {
   onStart: (qs: Question[], config: CustomConfig) => void
 }) {
   const { settings } = useSettings()
-  const [from, setFrom] = useState(1)
-  const [to, setTo] = useState(Math.min(10, questions.length))
+  const [from, setFrom] = useState('1')
+  const [to, setTo] = useState(String(Math.min(10, questions.length)))
   const [timeLimit, setTimeLimit] = useState<number | null>(90)
   const [shuffle, setShuffle] = useState(false)
   const [shuffleAnswers, setShuffleAnswers] = useState(settings.shuffleOptions)
   const [highlight, setHighlight] = useState(settings.highlightKeywords)
   const [hasLimit, setHasLimit] = useState(mode === 'practice')
 
-  const total = Math.max(0, to - from + 1)
+  // Inputs hold raw strings so they can be cleared and retyped freely. We clamp
+  // to a valid range only for computing totals / starting (and on blur).
+  const fromN = Math.min(questions.length, Math.max(1, parseInt(from) || 1))
+  const toN = Math.min(questions.length, Math.max(fromN, parseInt(to) || fromN))
+  const total = Math.max(0, toN - fromN + 1)
 
   function start() {
-    const slice = questions.slice(from - 1, to)
+    const slice = questions.slice(fromN - 1, toN)
     const ordered = shuffle ? [...slice].sort(() => Math.random() - 0.5) : slice
     const final = shuffleAnswers ? ordered.map(shuffleOptions) : ordered
-    onStart(final, { from, to, timeLimit: hasLimit ? timeLimit : null, shuffle, highlight })
+    onStart(final, { from: fromN, to: toN, timeLimit: hasLimit ? timeLimit : null, shuffle, highlight })
   }
 
   // Reusable checkboxes shared by the Practice and Custom setup screens.
@@ -88,13 +92,13 @@ function ExamSetup({ questions, mode, onStart }: {
                 <div className="flex-1">
                   <p className="text-xs text-gray-400 mb-1">From</p>
                   <input type="number" className="input-field text-center" min={1} max={questions.length}
-                    value={from} onChange={e => setFrom(Math.max(1, parseInt(e.target.value) || 1))} />
+                    value={from} onChange={e => setFrom(e.target.value)} onBlur={() => setFrom(String(fromN))} />
                 </div>
                 <span className="text-gray-400 pt-4">→</span>
                 <div className="flex-1">
                   <p className="text-xs text-gray-400 mb-1">To</p>
-                  <input type="number" className="input-field text-center" min={from} max={questions.length}
-                    value={to} onChange={e => setTo(Math.min(questions.length, parseInt(e.target.value) || from))} />
+                  <input type="number" className="input-field text-center" min={fromN} max={questions.length}
+                    value={to} onChange={e => setTo(e.target.value)} onBlur={() => setTo(String(toN))} />
                 </div>
               </div>
               <p className="text-xs text-gray-400 mt-1">{total} question{total !== 1 ? 's' : ''} selected · {questions.length} total</p>
@@ -135,13 +139,13 @@ function ExamSetup({ questions, mode, onStart }: {
                 <div className="flex-1">
                   <p className="text-xs text-gray-400 mb-1">From Q</p>
                   <input type="number" className="input-field text-center" min={1} max={questions.length}
-                    value={from} onChange={e => setFrom(Math.max(1, parseInt(e.target.value) || 1))} />
+                    value={from} onChange={e => setFrom(e.target.value)} onBlur={() => setFrom(String(fromN))} />
                 </div>
                 <span className="text-gray-400 pt-4">→</span>
                 <div className="flex-1">
                   <p className="text-xs text-gray-400 mb-1">To Q</p>
-                  <input type="number" className="input-field text-center" min={from} max={questions.length}
-                    value={to} onChange={e => setTo(Math.min(questions.length, parseInt(e.target.value) || from))} />
+                  <input type="number" className="input-field text-center" min={fromN} max={questions.length}
+                    value={to} onChange={e => setTo(e.target.value)} onBlur={() => setTo(String(toN))} />
                 </div>
               </div>
               <p className="text-xs text-gray-400 mt-1">{total} question{total !== 1 ? 's' : ''} · {questions.length} total</p>
