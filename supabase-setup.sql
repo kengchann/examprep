@@ -298,6 +298,15 @@ RETURNS TEXT LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
   FROM public.profiles WHERE id = auth.uid();
 $$;
 
+-- Is a question within the first 20 of its bank? SECURITY DEFINER so it reads
+-- `questions` WITHOUT re-triggering the questions RLS policy (avoids infinite
+-- recursion — a policy on `questions` must never query `questions` directly).
+CREATE OR REPLACE FUNCTION public.q_in_trial_window(q_bank uuid, q_order int)
+RETURNS BOOLEAN LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
+  SELECT (SELECT count(*) FROM public.questions q2
+            WHERE q2.bank_id = q_bank AND q2.order_index < q_order) < 20;
+$$;
+
 -- Keeps the trial "first 20" check fast.
 CREATE INDEX IF NOT EXISTS idx_questions_bank_order ON questions(bank_id, order_index);
 
@@ -317,9 +326,7 @@ CREATE POLICY "Read questions by tier and access" ON questions FOR SELECT USING 
     )
     AND (
       public.user_tier() = 'full'
-      OR (SELECT count(*) FROM questions q2
-            WHERE q2.bank_id = questions.bank_id
-              AND q2.order_index < questions.order_index) < 20
+      OR public.q_in_trial_window(questions.bank_id, questions.order_index)
     )
   )
 );
