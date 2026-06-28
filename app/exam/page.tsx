@@ -183,7 +183,47 @@ function ExamSetup({ questions, mode, onStart }: {
     )
   }
 
-  // Learning mode — just start
+  if (mode === 'learning') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <div className="bg-brand-600 px-4 pt-12 pb-5">
+          <h1 className="text-white text-xl font-bold">📖 Learning Mode</h1>
+          <p className="text-brand-200 text-sm">See answers &amp; explanations instantly</p>
+        </div>
+        <div className="px-4 pt-5 space-y-4">
+          <div className="card space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-600 block mb-2">Question range</label>
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <p className="text-xs text-gray-400 mb-1">From Q</p>
+                  <input type="number" className="input-field text-center" min={1} max={questions.length}
+                    value={from} onChange={e => setFrom(e.target.value)} onBlur={() => setFrom(String(fromN))} />
+                </div>
+                <span className="text-gray-400 pt-4">→</span>
+                <div className="flex-1">
+                  <p className="text-xs text-gray-400 mb-1">To Q</p>
+                  <input type="number" className="input-field text-center" min={fromN} max={questions.length}
+                    value={to} onChange={e => setTo(e.target.value)} onBlur={() => setTo(String(toN))} />
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">{total} question{total !== 1 ? 's' : ''} · {questions.length} total</p>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={shuffle} onChange={e => setShuffle(e.target.checked)} className="w-4 h-4 accent-brand-600" />
+              <span className="text-sm text-gray-700">Shuffle question order</span>
+            </label>
+            {shuffleAnswersCheckbox}
+            {highlightCheckbox}
+          </div>
+          <button onClick={start} disabled={total === 0} className="btn-primary py-4 text-base">
+            Start Learning ({total} question{total !== 1 ? 's' : ''}) →
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return null
 }
 
@@ -750,13 +790,6 @@ function ExamContent() {
       const { data } = await supabase.from('questions').select('*').eq('bank_id', bankId).order('order_index')
       if (!data || data.length === 0) { alert('No questions in this bank.'); router.push('/dashboard'); return }
       setAllQuestions(data as Question[])
-      // Learning mode starts immediately with all questions
-      if (mode === 'learning') {
-        const qs = data as Question[]
-        setExamQuestions(readStored().shuffleOptions ? qs.map(shuffleOptions) : qs)
-        setKeyword(readStored().highlightKeywords)
-        setSetupDone(true)
-      }
       setLoading(false)
     }
     load()
@@ -768,7 +801,7 @@ function ExamContent() {
     </div>
   )
 
-  if (!setupDone && mode !== 'learning') {
+  if (!setupDone) {
     return (
       <ExamSetup questions={allQuestions} mode={mode} onStart={(qs, config) => {
         setExamQuestions(qs)
