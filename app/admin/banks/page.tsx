@@ -28,7 +28,7 @@ export default function BanksPage() {
     if (!user) { router.push('/auth'); return }
     // Admin-only page — students are sent back to the dashboard
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
-    if (profile?.role !== 'admin') { router.replace('/dashboard'); return }
+    if (profile?.role !== 'admin' && profile?.role !== 'superadmin') { router.replace('/dashboard'); return }
     const { data } = await supabase.from('question_banks').select('*').order('created_at', { ascending: false })
     // Use the REAL question counts (the stored question_count column can drift).
     const { data: counts } = await supabase.from('questions').select('bank_id')
