@@ -31,7 +31,8 @@ export type Profile = {
   id: string
   email: string
   full_name: string | null
-  role: 'admin' | 'student'
+  role: 'superadmin' | 'admin' | 'student'
+  tier: 'trial' | 'full'        // students only; admins/superadmins are always full
   last_active: string | null
   created_at: string
 }

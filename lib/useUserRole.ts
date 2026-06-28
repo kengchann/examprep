@@ -2,12 +2,14 @@
 import { useEffect, useState } from 'react'
 import { createClient } from './supabase'
 
-export type Role = 'admin' | 'student'
+export type Role = 'superadmin' | 'admin' | 'student'
+export type Tier = 'trial' | 'full'
 
-// Fetches the signed-in user's role from the profiles table.
-// Defaults to 'student' if no profile row exists yet.
+// Fetches the signed-in user's role + tier from the profiles table.
+// Defaults to a trial student if no profile row exists yet.
 export function useUserRole() {
   const [role, setRole] = useState<Role | null>(null)
+  const [tier, setTier] = useState<Tier | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -15,10 +17,11 @@ export function useUserRole() {
     let active = true
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { if (active) { setRole(null); setLoading(false) } return }
-      const { data } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+      if (!user) { if (active) { setRole(null); setTier(null); setLoading(false) } return }
+      const { data } = await supabase.from('profiles').select('role, tier').eq('id', user.id).maybeSingle()
       if (active) {
         setRole((data?.role as Role) ?? 'student')
+        setTier((data?.tier as Tier) ?? 'trial')
         setLoading(false)
       }
     }
@@ -26,5 +29,13 @@ export function useUserRole() {
     return () => { active = false }
   }, [])
 
-  return { role, loading, isAdmin: role === 'admin' }
+  const isAdmin = role === 'admin' || role === 'superadmin'
+  return {
+    role,
+    tier,
+    loading,
+    isAdmin,                                   // admin OR superadmin
+    isSuperadmin: role === 'superadmin',
+    isTrial: role === 'student' && tier === 'trial',
+  }
 }

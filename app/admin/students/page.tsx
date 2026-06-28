@@ -5,6 +5,12 @@ import { useRouter } from 'next/navigation'
 import BottomNav from '@/components/BottomNav'
 import type { Profile, QuestionBank, Attempt } from '@/lib/types'
 
+const ROLE_DESC: Record<string, string> = {
+  superadmin: 'Full control, including roles & access',
+  admin: 'Manage banks, questions & students',
+  student: 'Takes exams (trial or full)',
+}
+
 function fmtDate(s: string | null) {
   if (!s) return '—'
   return new Date(s).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
@@ -29,6 +35,7 @@ export default function StudentsPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [myId, setMyId] = useState('')
+  const [isSuper, setIsSuper] = useState(false)
 
   // Manage modal
   const [managing, setManaging] = useState<Profile | null>(null)
@@ -45,8 +52,10 @@ export default function StudentsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/auth'); return }
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
-      if (profile?.role !== 'admin') { router.replace('/dashboard'); return }
+      const myRole = profile?.role
+      if (myRole !== 'admin' && myRole !== 'superadmin') { router.replace('/dashboard'); return }
       setMyId(user.id)
+      setIsSuper(myRole === 'superadmin')
 
       const [{ data: profs }, { data: bks }] = await Promise.all([
         supabase.from('profiles').select('*').order('created_at', { ascending: false }),
@@ -86,13 +95,23 @@ export default function StudentsPage() {
     }
   }
 
-  async function toggleRole() {
-    if (!managing || managing.id === myId) return
-    const newRole = managing.role === 'admin' ? 'student' : 'admin'
+  // Superadmin only — change a user's role (cannot change own).
+  async function changeRole(newRole: 'student' | 'admin' | 'superadmin') {
+    if (!managing || managing.id === myId || !isSuper || managing.role === newRole) return
     if (!confirm(`Change ${managing.email} to ${newRole.toUpperCase()}?`)) return
-    await supabase.from('profiles').update({ role: newRole }).eq('id', managing.id)
+    const { error } = await supabase.rpc('set_user_role', { target: managing.id, new_role: newRole })
+    if (error) { alert(`Could not change role: ${error.message}`); return }
     setProfiles(prev => prev.map(p => p.id === managing.id ? { ...p, role: newRole } : p))
     setManaging(prev => prev ? { ...prev, role: newRole } : prev)
+  }
+
+  // Admin or superadmin — set a student's trial/full access.
+  async function changeTier(newTier: 'trial' | 'full') {
+    if (!managing || managing.role !== 'student' || managing.tier === newTier) return
+    const { error } = await supabase.rpc('set_user_tier', { target: managing.id, new_tier: newTier })
+    if (error) { alert(`Could not change access: ${error.message}`); return }
+    setProfiles(prev => prev.map(p => p.id === managing.id ? { ...p, tier: newTier } : p))
+    setManaging(prev => prev ? { ...prev, tier: newTier } : prev)
   }
 
   const filtered = profiles.filter(p => {
@@ -101,8 +120,9 @@ export default function StudentsPage() {
     return (p.full_name || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q)
   })
 
-  const adminCount = profiles.filter(p => p.role === 'admin').length
-  const studentCount = profiles.length - adminCount
+  const staffCount = profiles.filter(p => p.role === 'admin' || p.role === 'superadmin').length
+  const studentCount = profiles.filter(p => p.role === 'student').length
+  const trialCount = profiles.filter(p => p.role === 'student' && p.tier === 'trial').length
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -120,12 +140,12 @@ export default function StudentsPage() {
               <p className="text-xs text-gray-400">Students</p>
             </div>
             <div className="card flex-1 text-center py-3">
-              <p className="text-2xl font-bold text-gray-900">{adminCount}</p>
-              <p className="text-xs text-gray-400">Admins</p>
+              <p className="text-2xl font-bold text-amber-600">{trialCount}</p>
+              <p className="text-xs text-gray-400">On trial</p>
             </div>
             <div className="card flex-1 text-center py-3">
-              <p className="text-2xl font-bold text-gray-900">{banks.length}</p>
-              <p className="text-xs text-gray-400">Banks</p>
+              <p className="text-2xl font-bold text-gray-900">{staffCount}</p>
+              <p className="text-xs text-gray-400">Admins</p>
             </div>
           </div>
         )}
@@ -154,7 +174,9 @@ export default function StudentsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-semibold text-gray-900 truncate">{p.full_name || 'Unnamed'}</p>
+                    {p.role === 'superadmin' && <span className="tag bg-purple-100 text-purple-700 text-xs">Superadmin</span>}
                     {p.role === 'admin' && <span className="tag bg-brand-50 text-brand-600 text-xs">Admin</span>}
+                    {p.role === 'student' && p.tier === 'trial' && <span className="tag bg-amber-100 text-amber-700 text-xs">Trial</span>}
                     {p.id === myId && <span className="tag bg-gray-100 text-gray-500 text-xs">You</span>}
                   </div>
                   <p className="text-xs text-gray-400 truncate">{p.email}</p>
@@ -183,20 +205,50 @@ export default function StudentsPage() {
 
             <div className="overflow-y-auto px-4 py-4 space-y-5">
               {/* Role */}
-              <div className="flex items-center justify-between">
-                <div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
                   <p className="text-sm font-medium text-gray-700">Role</p>
-                  <p className="text-xs text-gray-400">{managing.role === 'admin' ? 'Can manage banks, questions & students' : 'Can only take assigned exams'}</p>
+                  {managing.id === myId
+                    ? <span className="tag bg-gray-100 text-gray-400 text-xs">You</span>
+                    : <span className="tag bg-gray-100 text-gray-500 text-xs capitalize">{managing.role}</span>}
                 </div>
-                {managing.id === myId ? (
-                  <span className="tag bg-gray-100 text-gray-400 text-xs">You</span>
-                ) : (
-                  <button onClick={toggleRole}
-                    className="text-sm font-medium text-brand-600 border border-brand-600 rounded-lg px-3 py-1.5 active:scale-95">
-                    {managing.role === 'admin' ? 'Make student' : 'Make admin'}
-                  </button>
-                )}
+                <p className="text-xs text-gray-400 mb-2">{ROLE_DESC[managing.role]}</p>
+                {isSuper && managing.id !== myId ? (
+                  <div className="flex bg-gray-200 rounded-xl p-1">
+                    {(['student', 'admin', 'superadmin'] as const).map(r => (
+                      <button key={r} onClick={() => changeRole(r)}
+                        className={`flex-1 py-2 rounded-lg text-xs font-medium capitalize transition-all ${managing.role === r ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500'}`}>
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                ) : managing.id !== myId ? (
+                  <p className="text-xs text-gray-400">Only a superadmin can change roles.</p>
+                ) : null}
               </div>
+
+              {/* Access tier (students only) */}
+              {managing.role === 'student' && (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-medium text-gray-700">Access</p>
+                    <span className={`tag text-xs ${managing.tier === 'full' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {managing.tier === 'full' ? 'Full access' : 'Free trial'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mb-2">Trial users can only open the first 20 questions of each bank.</p>
+                  <div className="flex bg-gray-200 rounded-xl p-1">
+                    <button onClick={() => changeTier('trial')}
+                      className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${managing.tier === 'trial' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-500'}`}>
+                      Free trial
+                    </button>
+                    <button onClick={() => changeTier('full')}
+                      className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${managing.tier === 'full' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500'}`}>
+                      Full access
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Activity */}
               <div>

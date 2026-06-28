@@ -268,6 +268,92 @@ CREATE POLICY "Users manage own highlights" ON question_highlights
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 -- ============================================
+-- v2.7 — Account tiers: superadmin / admin / student + free trial
+--   roles : 'superadmin' > 'admin' > 'student'
+--   tier  : 'trial' (first 20 questions per bank) or 'full'  (students only)
+-- ============================================
+
+-- Student access tier. New signups default to 'trial'.
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS tier TEXT NOT NULL DEFAULT 'trial';
+
+-- OPTIONAL — run ONCE if you already have real students who should keep full
+-- access (otherwise they'd drop to trial). Leave commented to stay re-runnable:
+-- UPDATE public.profiles SET tier = 'full' WHERE role = 'student';
+
+-- is_admin() now also covers superadmin (so superadmin keeps every admin power).
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
+  SELECT EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('admin','superadmin'));
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_superadmin()
+RETURNS BOOLEAN LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
+  SELECT EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'superadmin');
+$$;
+
+-- Effective tier of the current user (admins/superadmins are always 'full').
+CREATE OR REPLACE FUNCTION public.user_tier()
+RETURNS TEXT LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
+  SELECT CASE WHEN role IN ('admin','superadmin') THEN 'full' ELSE COALESCE(tier,'trial') END
+  FROM public.profiles WHERE id = auth.uid();
+$$;
+
+-- Keeps the trial "first 20" check fast.
+CREATE INDEX IF NOT EXISTS idx_questions_bank_order ON questions(bank_id, order_index);
+
+-- Tier-aware question reads: admins see all; full students see assigned/open
+-- banks; trial students see only the first 20 questions of those banks.
+DROP POLICY IF EXISTS "Read questions of assigned or open banks" ON questions;
+DROP POLICY IF EXISTS "Read questions by tier and access" ON questions;
+CREATE POLICY "Read questions by tier and access" ON questions FOR SELECT USING (
+  public.is_admin()
+  OR (
+    EXISTS (
+      SELECT 1 FROM question_banks b
+      WHERE b.id = questions.bank_id
+        AND (b.is_open OR EXISTS (
+          SELECT 1 FROM bank_access ba WHERE ba.bank_id = b.id AND ba.student_id = auth.uid()
+        ))
+    )
+    AND (
+      public.user_tier() = 'full'
+      OR (SELECT count(*) FROM questions q2
+            WHERE q2.bank_id = questions.bank_id
+              AND q2.order_index < questions.order_index) < 20
+    )
+  )
+);
+
+-- Lock down profile writes: no broad admin update. Role/tier changes go through
+-- the SECURITY DEFINER functions below, which enforce who may do what.
+DROP POLICY IF EXISTS "Admins can update profiles" ON profiles;
+
+-- Admins (and superadmins) set a STUDENT's trial/full tier.
+CREATE OR REPLACE FUNCTION public.set_user_tier(target uuid, new_tier text)
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NOT public.is_admin() THEN RAISE EXCEPTION 'not authorized'; END IF;
+  IF new_tier NOT IN ('trial','full') THEN RAISE EXCEPTION 'invalid tier'; END IF;
+  UPDATE public.profiles SET tier = new_tier WHERE id = target AND role = 'student';
+END; $$;
+
+-- Only a SUPERADMIN may change roles, and never their own.
+CREATE OR REPLACE FUNCTION public.set_user_role(target uuid, new_role text)
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NOT public.is_superadmin() THEN RAISE EXCEPTION 'not authorized'; END IF;
+  IF target = auth.uid() THEN RAISE EXCEPTION 'cannot change your own role'; END IF;
+  IF new_role NOT IN ('student','admin','superadmin') THEN RAISE EXCEPTION 'invalid role'; END IF;
+  UPDATE public.profiles SET role = new_role WHERE id = target;
+END; $$;
+
+GRANT EXECUTE ON FUNCTION public.set_user_tier(uuid, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.set_user_role(uuid, text) TO authenticated;
+
+-- 👑 MAKE YOURSELF SUPERADMIN — run this once with your login email:
+-- UPDATE public.profiles SET role = 'superadmin' WHERE email = 'kengchann@gmail.com';
+
+-- ============================================
 -- 👑 MAKE YOURSELF ADMIN
 -- Replace the email with the one you log into the app with, then run this line:
 -- ============================================

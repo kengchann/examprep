@@ -23,7 +23,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [selectedBank, setSelectedBank] = useState<QuestionBank | null>(null)
   const [selectedMode, setSelectedMode] = useState<ExamMode>('practice')
-  const { isAdmin } = useUserRole()
+  const { isAdmin, isTrial } = useUserRole()
   const { settings } = useSettings()
   const [resume, setResume] = useState<{ bankId: string; bankName: string; mode: ExamMode; answered: number; total: number } | null>(null)
   const router = useRouter()
@@ -113,6 +113,19 @@ export default function Dashboard() {
       </div>
 
       <div className="px-4 pt-5 space-y-5">
+        {/* Free-trial notice */}
+        {isTrial && (
+          <div className="card border-amber-200 bg-amber-50">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🎁</span>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-amber-900 text-sm">Free trial</p>
+                <p className="text-xs text-amber-700">You can preview the first 20 questions of each bank. Contact your admin to unlock everything.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Resume in-progress exam */}
         {resume && (
           <div className="card border-brand-200 bg-brand-50">
