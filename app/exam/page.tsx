@@ -46,6 +46,7 @@ function ExamSetup({ questions, mode, onStart }: {
   const [to, setTo] = useState(Math.min(10, questions.length))
   const [timeLimit, setTimeLimit] = useState<number | null>(90)
   const [shuffle, setShuffle] = useState(false)
+  const [shuffleAnswers, setShuffleAnswers] = useState(settings.shuffleOptions)
   const [highlight, setHighlight] = useState(settings.highlightKeywords)
   const [hasLimit, setHasLimit] = useState(mode === 'practice')
 
@@ -54,11 +55,17 @@ function ExamSetup({ questions, mode, onStart }: {
   function start() {
     const slice = questions.slice(from - 1, to)
     const ordered = shuffle ? [...slice].sort(() => Math.random() - 0.5) : slice
-    const final = settings.shuffleOptions ? ordered.map(shuffleOptions) : ordered
+    const final = shuffleAnswers ? ordered.map(shuffleOptions) : ordered
     onStart(final, { from, to, timeLimit: hasLimit ? timeLimit : null, shuffle, highlight })
   }
 
-  // Reusable "Highlight keywords" checkbox for the setup screens.
+  // Reusable checkboxes shared by the Practice and Custom setup screens.
+  const shuffleAnswersCheckbox = (
+    <label className="flex items-center gap-2 cursor-pointer">
+      <input type="checkbox" checked={shuffleAnswers} onChange={e => setShuffleAnswers(e.target.checked)} className="w-4 h-4 accent-brand-600" />
+      <span className="text-sm text-gray-700">Shuffle answer choices (A–D)</span>
+    </label>
+  )
   const highlightCheckbox = (
     <label className="flex items-center gap-2 cursor-pointer">
       <input type="checkbox" checked={highlight} onChange={e => setHighlight(e.target.checked)} className="w-4 h-4 accent-brand-600" />
@@ -102,6 +109,7 @@ function ExamSetup({ questions, mode, onStart }: {
               <input type="checkbox" checked={shuffle} onChange={e => setShuffle(e.target.checked)} className="w-4 h-4 accent-brand-600" />
               <span className="text-sm text-gray-700">Shuffle question order</span>
             </label>
+            {shuffleAnswersCheckbox}
             {highlightCheckbox}
           </div>
           <button onClick={start} disabled={total === 0} className="btn-primary py-4 text-base">
@@ -159,6 +167,7 @@ function ExamSetup({ questions, mode, onStart }: {
               <input type="checkbox" checked={shuffle} onChange={e => setShuffle(e.target.checked)} className="w-4 h-4 accent-brand-600" />
               <span className="text-sm text-gray-700">Shuffle question order</span>
             </label>
+            {shuffleAnswersCheckbox}
             {highlightCheckbox}
           </div>
           <button onClick={start} disabled={total === 0} className="btn-primary py-4 text-base">
