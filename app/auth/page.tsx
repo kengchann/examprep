@@ -47,7 +47,7 @@ export default function AuthPage() {
         email, password,
         options: {
           data: { full_name: name },
-          emailRedirectTo: `${window.location.origin}/auth`,
+          emailRedirectTo: `${window.location.origin}/welcome`,
         },
       })
       if (error) setError(error.message)
@@ -74,7 +74,7 @@ export default function AuthPage() {
     setLoading(true); setError(''); setMessage('')
     const { error } = await supabase.auth.resend({
       type: 'signup', email,
-      options: { emailRedirectTo: `${window.location.origin}/auth` },
+      options: { emailRedirectTo: `${window.location.origin}/welcome` },
     })
     if (error) setError(error.message)
     else { setMessage('Confirmation email re-sent. Check your inbox (and spam).'); setCanResend(false) }
