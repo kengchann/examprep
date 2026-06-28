@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import BottomNav from '@/components/BottomNav'
 import type { Question, QuestionBank, QuestionType } from '@/lib/types'
 import { parseQuestionCSV, CSV_TEMPLATE, type ParsedCSVRow } from '@/lib/csv'
+import { classifyTopic } from '@/lib/topics'
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 const MAX_OPTIONS = 8
@@ -66,6 +67,12 @@ export default function QuestionsPage() {
   const [duplicateOf, setDuplicateOf] = useState<{ order_index: number; question_text: string } | null>(null)
   const [dupGroups, setDupGroups] = useState<DupGroup[] | null>(null)
   const [scanningDups, setScanningDups] = useState(false)
+
+  // Auto-tag topics
+  const [tagging, setTagging] = useState(false)
+  const [tagProgress, setTagProgress] = useState(0)
+  const [tagTotal, setTagTotal] = useState(0)
+  const [tagSummary, setTagSummary] = useState<Record<string, number> | null>(null)
 
   // CSV import state
   const [importRows, setImportRows] = useState<ParsedCSVRow[] | null>(null)
@@ -580,6 +587,42 @@ export default function QuestionsPage() {
     setScanningDups(false)
   }
 
+  // Classify every question in the bank into clustered topics and save them.
+  // Groups by topic and updates in chunks (a few requests, not 911).
+  async function autoTagTopics() {
+    if (!selectedBank) return
+    if (!confirm('Auto-tag every question in this bank into clustered topics?\nThis overwrites the current topics.')) return
+    setTagging(true); setTagSummary(null); setTagProgress(0)
+    const { data, error } = await supabase.from('questions')
+      .select('id, question_text, options').eq('bank_id', selectedBank)
+    if (error || !data) { alert('Could not load questions: ' + (error?.message || '')); setTagging(false); return }
+
+    setTagTotal(data.length)
+    const groups = new Map<string, string[]>()
+    for (const q of data as { id: string; question_text: string; options: string[] }[]) {
+      const t = classifyTopic(q.question_text, q.options || [])
+      const arr = groups.get(t) || []
+      arr.push(q.id); groups.set(t, arr)
+    }
+
+    let done = 0
+    const summary: Record<string, number> = {}
+    for (const t of Array.from(groups.keys())) {
+      const ids = groups.get(t)!
+      summary[t] = ids.length
+      for (let i = 0; i < ids.length; i += 200) {
+        const chunk = ids.slice(i, i + 200)
+        const { error: uerr } = await supabase.from('questions').update({ topic: t }).in('id', chunk)
+        if (uerr) { alert('Update failed: ' + uerr.message); setTagging(false); return }
+        done += chunk.length
+        setTagProgress(done)
+      }
+    }
+    setTagSummary(summary)
+    setTagging(false)
+    loadQuestions(true)
+  }
+
   async function deleteFromScanner(id: string) {
     if (!confirm('Delete this question?')) return
     await supabase.from('questions').delete().eq('id', id)
@@ -659,10 +702,26 @@ export default function QuestionsPage() {
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg leading-none">×</button>
                   )}
                 </div>
-                <button onClick={findDuplicates} disabled={scanningDups}
-                  className="text-xs font-medium text-brand-600 active:scale-95 disabled:opacity-50">
-                  {scanningDups ? 'Scanning…' : '🔁 Find duplicate questions'}
-                </button>
+                <div className="flex items-center gap-4">
+                  <button onClick={findDuplicates} disabled={scanningDups}
+                    className="text-xs font-medium text-brand-600 active:scale-95 disabled:opacity-50">
+                    {scanningDups ? 'Scanning…' : '🔁 Find duplicate questions'}
+                  </button>
+                  <button onClick={autoTagTopics} disabled={tagging}
+                    className="text-xs font-medium text-brand-600 active:scale-95 disabled:opacity-50">
+                    {tagging ? `Tagging… ${tagProgress}/${tagTotal}` : '🏷️ Auto-tag topics'}
+                  </button>
+                </div>
+                {tagSummary && (
+                  <div className="card bg-brand-50 border-brand-100">
+                    <p className="text-xs font-semibold text-brand-700 mb-1">Topics tagged ✓</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.entries(tagSummary).sort((a, b) => b[1] - a[1]).map(([t, n]) => (
+                        <span key={t} className="tag bg-white text-gray-600 text-xs border border-gray-200">{t}: {n}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
