@@ -3,13 +3,23 @@ import './globals.css'
 import { SettingsProvider } from '@/lib/settings'
 
 export const metadata: Metadata = {
-  title: 'ExamPrep',
-  description: 'IT & Academic Exam Simulator',
+  metadataBase: new URL('https://examprep-blue.vercel.app'),
+  title: { default: 'ExamPrep', template: '%s · ExamPrep' },
+  description: 'IT & Academic Exam Simulator — practice real exam questions, track your progress, and pass with confidence.',
+  applicationName: 'ExamPrep',
+  appleWebApp: { capable: true, title: 'ExamPrep', statusBarStyle: 'default' },
+  openGraph: {
+    title: 'ExamPrep',
+    description: 'IT & Academic Exam Simulator',
+    siteName: 'ExamPrep',
+    type: 'website',
+  },
 }
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
+  themeColor: '#534AB7',
 }
 
 // Runs before the page paints so dark mode / large text apply with no flash.
