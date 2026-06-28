@@ -253,6 +253,21 @@ CREATE POLICY "Users manage own bookmarks" ON bookmarks
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 -- ============================================
+-- v2.6 — Personal per-question highlights (student-created), cloud-synced
+-- ============================================
+CREATE TABLE IF NOT EXISTS question_highlights (
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  question_id UUID REFERENCES questions(id) ON DELETE CASCADE,
+  phrases TEXT[] NOT NULL DEFAULT '{}',
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (user_id, question_id)
+);
+ALTER TABLE question_highlights ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users manage own highlights" ON question_highlights;
+CREATE POLICY "Users manage own highlights" ON question_highlights
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- ============================================
 -- 👑 MAKE YOURSELF ADMIN
 -- Replace the email with the one you log into the app with, then run this line:
 -- ============================================

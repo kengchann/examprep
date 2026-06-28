@@ -3,6 +3,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { Suspense, useEffect, useState } from 'react'
 import { useSettings, tapFeedback } from '@/lib/settings'
 import { fetchBookmarkIds, addBookmark, removeBookmark } from '@/lib/bookmarks'
+import { fetchHighlightMap, saveHighlights } from '@/lib/highlights'
 import KeywordText from '@/components/KeywordText'
 import type { AttemptResult } from '@/lib/types'
 
@@ -30,6 +31,20 @@ function ResultsContent() {
       return n
     })
     if (has) removeBookmark(questionId); else addBookmark(questionId, null)
+  }
+
+  // Personal text highlights, so review matches what you marked during the exam.
+  const [highlights, setHighlights] = useState<Map<string, string[]>>(new Map())
+  useEffect(() => { fetchHighlightMap().then(setHighlights) }, [])
+  function addHighlight(questionId: string, phrase: string) {
+    const next = Array.from(new Set([...(highlights.get(questionId) ?? []), phrase]))
+    setHighlights(prev => new Map(prev).set(questionId, next))
+    saveHighlights(questionId, next)
+  }
+  function removeHighlight(questionId: string, phrase: string) {
+    const next = (highlights.get(questionId) ?? []).filter(p => p.toLowerCase() !== phrase.toLowerCase())
+    setHighlights(prev => new Map(prev).set(questionId, next))
+    saveHighlights(questionId, next)
   }
 
   // Results are passed via sessionStorage (too large for the URL). Fall back to
@@ -218,7 +233,13 @@ function ResultsContent() {
                         </button>
                       </div>
                       <div className="text-sm font-medium text-gray-800 leading-snug whitespace-pre-wrap break-words">
-                        <KeywordText text={r.question_text} enabled={settings.highlightKeywords} />
+                        <KeywordText
+                          text={r.question_text}
+                          enabled={settings.highlightKeywords}
+                          personal={highlights.get(r.questionId) ?? []}
+                          onAddHighlight={phrase => addHighlight(r.questionId, phrase)}
+                          onRemoveHighlight={phrase => removeHighlight(r.questionId, phrase)}
+                        />
                       </div>
                       {r.image_url && (
                         // eslint-disable-next-line @next/next/no-img-element

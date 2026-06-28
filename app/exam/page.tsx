@@ -9,6 +9,7 @@ import {
 } from '@/lib/session'
 import { readDeck } from '@/lib/deck'
 import { fetchBookmarkIds, addBookmark, removeBookmark } from '@/lib/bookmarks'
+import { fetchHighlightMap, saveHighlights } from '@/lib/highlights'
 import KeywordText from '@/components/KeywordText'
 import type { Question, ExamMode, ExamAnswer } from '@/lib/types'
 
@@ -33,7 +34,7 @@ function shuffleOptions(q: Question): Question {
 }
 
 type CustomConfig = {
-  from: number; to: number; timeLimit: number | null; shuffle: boolean
+  from: number; to: number; timeLimit: number | null; shuffle: boolean; highlight: boolean
 }
 
 function ExamSetup({ questions, mode, onStart }: {
@@ -45,6 +46,7 @@ function ExamSetup({ questions, mode, onStart }: {
   const [to, setTo] = useState(Math.min(10, questions.length))
   const [timeLimit, setTimeLimit] = useState<number | null>(90)
   const [shuffle, setShuffle] = useState(false)
+  const [highlight, setHighlight] = useState(settings.highlightKeywords)
   const [hasLimit, setHasLimit] = useState(mode === 'practice')
 
   const total = Math.max(0, to - from + 1)
@@ -53,8 +55,16 @@ function ExamSetup({ questions, mode, onStart }: {
     const slice = questions.slice(from - 1, to)
     const ordered = shuffle ? [...slice].sort(() => Math.random() - 0.5) : slice
     const final = settings.shuffleOptions ? ordered.map(shuffleOptions) : ordered
-    onStart(final, { from, to, timeLimit: hasLimit ? timeLimit : null, shuffle })
+    onStart(final, { from, to, timeLimit: hasLimit ? timeLimit : null, shuffle, highlight })
   }
+
+  // Reusable "Highlight keywords" checkbox for the setup screens.
+  const highlightCheckbox = (
+    <label className="flex items-center gap-2 cursor-pointer">
+      <input type="checkbox" checked={highlight} onChange={e => setHighlight(e.target.checked)} className="w-4 h-4 accent-brand-600" />
+      <span className="text-sm text-gray-700">Highlight keywords (tap for hints)</span>
+    </label>
+  )
 
   if (mode === 'practice') {
     return (
@@ -92,6 +102,7 @@ function ExamSetup({ questions, mode, onStart }: {
               <input type="checkbox" checked={shuffle} onChange={e => setShuffle(e.target.checked)} className="w-4 h-4 accent-brand-600" />
               <span className="text-sm text-gray-700">Shuffle question order</span>
             </label>
+            {highlightCheckbox}
           </div>
           <button onClick={start} disabled={total === 0} className="btn-primary py-4 text-base">
             Start Practice Exam ({total} questions) →
@@ -148,6 +159,7 @@ function ExamSetup({ questions, mode, onStart }: {
               <input type="checkbox" checked={shuffle} onChange={e => setShuffle(e.target.checked)} className="w-4 h-4 accent-brand-600" />
               <span className="text-sm text-gray-700">Shuffle question order</span>
             </label>
+            {highlightCheckbox}
           </div>
           <button onClick={start} disabled={total === 0} className="btn-primary py-4 text-base">
             Start Custom Exam ({total} questions) →
@@ -161,9 +173,9 @@ function ExamSetup({ questions, mode, onStart }: {
   return null
 }
 
-function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState }: {
+function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState, keywordInit }: {
   questions: Question[]; mode: ExamMode; bankId: string; bankName: string; timeLimit: number | null
-  resumeState?: SessionState | null
+  resumeState?: SessionState | null; keywordInit: boolean
 }) {
   const router = useRouter()
   const supabase = createClient()
@@ -183,6 +195,8 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState 
   const [showTimeWarning, setShowTimeWarning] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [bookmarks, setBookmarks] = useState<Set<string>>(new Set())
+  const [keywordOn, setKeywordOn] = useState(keywordInit)
+  const [highlights, setHighlights] = useState<Map<string, string[]>>(new Map())
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const questionStartRef = useRef(Date.now())
   const warnedRef = useRef(false)
@@ -194,6 +208,22 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState 
 
   // Load this user's starred questions so the ⭐ shows the right state.
   useEffect(() => { fetchBookmarkIds().then(setBookmarks) }, [])
+
+  // Load this user's personal text highlights for these questions.
+  useEffect(() => { fetchHighlightMap().then(setHighlights) }, [])
+
+  function addHighlight(phrase: string) {
+    const id = q.id
+    const next = Array.from(new Set([...(highlights.get(id) ?? []), phrase]))
+    setHighlights(prev => new Map(prev).set(id, next))
+    saveHighlights(id, next)
+  }
+  function removeHighlight(phrase: string) {
+    const id = q.id
+    const next = (highlights.get(id) ?? []).filter(p => p.toLowerCase() !== phrase.toLowerCase())
+    setHighlights(prev => new Map(prev).set(id, next))
+    saveHighlights(id, next)
+  }
 
   function toggleStar() {
     const id = q.id
@@ -505,6 +535,9 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState 
               {q.question_type === 'multiple' ? 'Multiple answer' : q.question_type === 'truefalse' ? 'True / False' : 'Single answer'}
             </span>
             <div className="ml-auto flex items-center gap-3">
+              <button onClick={() => setKeywordOn(v => !v)} className={`text-lg active:scale-95 ${keywordOn ? '' : 'opacity-30 grayscale'}`} title="Toggle keyword hints">
+                🔆
+              </button>
               <button onClick={toggleStar} className="text-lg active:scale-95" title="Bookmark this question">
                 {bookmarks.has(q.id) ? '⭐' : '☆'}
               </button>
@@ -514,7 +547,13 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState 
             </div>
           </div>
           <div className="text-gray-900 text-base leading-relaxed font-medium whitespace-pre-wrap break-words">
-            <KeywordText text={q.question_text} enabled={settings.highlightKeywords} />
+            <KeywordText
+              text={q.question_text}
+              enabled={keywordOn}
+              personal={highlights.get(q.id) ?? []}
+              onAddHighlight={addHighlight}
+              onRemoveHighlight={removeHighlight}
+            />
           </div>
           {q.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -622,6 +661,7 @@ function ExamContent() {
   const [setupDone, setSetupDone] = useState(false)
   const [timeLimit, setTimeLimit] = useState<number | null>(null)
   const [resumeState, setResumeState] = useState<SessionState | null>(null)
+  const [keyword, setKeyword] = useState(true)
   const router = useRouter()
   const params = useSearchParams()
   const bankId = params.get('bank') || ''
@@ -643,6 +683,7 @@ function ExamContent() {
           setExamQuestions(saved.meta.questions)
           setTimeLimit(saved.meta.timeLimit)
           setResumeState(saved.state)
+          setKeyword(readStored().highlightKeywords)
           setSetupDone(true)
           setLoading(false)
           return
@@ -656,6 +697,7 @@ function ExamContent() {
         const qs = readDeck()
         if (qs.length === 0) { alert('This study deck is empty.'); router.push('/study'); return }
         setExamQuestions(readStored().shuffleOptions ? qs.map(shuffleOptions) : qs)
+        setKeyword(readStored().highlightKeywords)
         setSetupDone(true)
         setLoading(false)
         return
@@ -668,6 +710,7 @@ function ExamContent() {
       if (mode === 'learning') {
         const qs = data as Question[]
         setExamQuestions(readStored().shuffleOptions ? qs.map(shuffleOptions) : qs)
+        setKeyword(readStored().highlightKeywords)
         setSetupDone(true)
       }
       setLoading(false)
@@ -686,12 +729,13 @@ function ExamContent() {
       <ExamSetup questions={allQuestions} mode={mode} onStart={(qs, config) => {
         setExamQuestions(qs)
         setTimeLimit(config.timeLimit)
+        setKeyword(config.highlight)
         setSetupDone(true)
       }} />
     )
   }
 
-  return <ExamRunner questions={examQuestions} mode={mode} bankId={bankId} bankName={bankName} timeLimit={timeLimit} resumeState={resumeState} />
+  return <ExamRunner questions={examQuestions} mode={mode} bankId={bankId} bankName={bankName} timeLimit={timeLimit} resumeState={resumeState} keywordInit={keyword} />
 }
 
 export default function ExamPage() {

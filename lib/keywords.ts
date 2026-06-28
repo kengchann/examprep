@@ -119,6 +119,31 @@ function ensureBuilt() {
   _re = new RegExp('\\b(' + escaped.join('|') + ')\\b', 'gi')
 }
 
+function escapeRegExp(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// Split text by an arbitrary list of phrases (used for a user's personal
+// highlights). Case-insensitive, longest match first, no word boundaries
+// (selections can start/end mid-word or include punctuation).
+export function splitByPhrases(text: string, phrases: string[]): { text: string; matched: boolean }[] {
+  const valid = Array.from(new Set(phrases.map(p => p.trim()).filter(Boolean)))
+  if (valid.length === 0) return [{ text, matched: false }]
+  const sorted = valid.sort((a, b) => b.length - a.length)
+  const re = new RegExp('(' + sorted.map(escapeRegExp).join('|') + ')', 'gi')
+  const out: { text: string; matched: boolean }[] = []
+  let last = 0
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) out.push({ text: text.slice(last, m.index), matched: false })
+    out.push({ text: m[0], matched: true })
+    last = m.index + m[0].length
+    if (m.index === re.lastIndex) re.lastIndex++
+  }
+  if (last < text.length) out.push({ text: text.slice(last), matched: false })
+  return out
+}
+
 // Split text into plain + highlighted parts. Highlighted parts carry a hint.
 export function splitKeywords(text: string): Part[] {
   ensureBuilt()
