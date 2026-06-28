@@ -238,6 +238,21 @@ CREATE POLICY "Read questions of assigned or open banks" ON questions FOR SELECT
 ALTER TABLE attempts ADD COLUMN IF NOT EXISTS details JSONB;
 
 -- ============================================
+-- v2.5 — Bookmarks ("starred" questions), cloud-synced per user
+-- ============================================
+CREATE TABLE IF NOT EXISTS bookmarks (
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  question_id UUID REFERENCES questions(id) ON DELETE CASCADE,
+  bank_id UUID REFERENCES question_banks(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (user_id, question_id)
+);
+ALTER TABLE bookmarks ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users manage own bookmarks" ON bookmarks;
+CREATE POLICY "Users manage own bookmarks" ON bookmarks
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- ============================================
 -- 👑 MAKE YOURSELF ADMIN
 -- Replace the email with the one you log into the app with, then run this line:
 -- ============================================

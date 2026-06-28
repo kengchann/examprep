@@ -1,6 +1,9 @@
 'use client'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Suspense, useEffect, useState } from 'react'
+import { useSettings, tapFeedback } from '@/lib/settings'
+import { fetchBookmarkIds, addBookmark, removeBookmark } from '@/lib/bookmarks'
+import KeywordText from '@/components/KeywordText'
 import type { AttemptResult } from '@/lib/types'
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
@@ -13,6 +16,21 @@ function ResultsContent() {
   const elapsed = parseInt(params.get('elapsed') || '0')
   const [tab, setTab] = useState<'summary' | 'review' | 'topics'>('summary')
   const [showFlagged, setShowFlagged] = useState(false)
+  const { settings } = useSettings()
+
+  // Starred questions, so the ⭐ on each review card shows the right state.
+  const [bookmarks, setBookmarks] = useState<Set<string>>(new Set())
+  useEffect(() => { fetchBookmarkIds().then(setBookmarks) }, [])
+  function toggleStar(questionId: string) {
+    const has = bookmarks.has(questionId)
+    tapFeedback(settings.feedback)
+    setBookmarks(prev => {
+      const n = new Set(prev)
+      if (has) n.delete(questionId); else n.add(questionId)
+      return n
+    })
+    if (has) removeBookmark(questionId); else addBookmark(questionId, null)
+  }
 
   // Results are passed via sessionStorage (too large for the URL). Fall back to
   // the legacy ?results= query param if present, for older links.
@@ -195,8 +213,13 @@ function ResultsContent() {
                         <span className={`tag text-xs ${r.question_type === 'multiple' ? 'bg-purple-100 text-purple-700' : r.question_type === 'truefalse' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
                           {r.question_type === 'multiple' ? 'Multi' : r.question_type === 'truefalse' ? 'T/F' : 'Single'}
                         </span>
+                        <button onClick={() => toggleStar(r.questionId)} className="ml-auto text-base active:scale-95" title="Bookmark this question">
+                          {bookmarks.has(r.questionId) ? '⭐' : '☆'}
+                        </button>
                       </div>
-                      <p className="text-sm font-medium text-gray-800 leading-snug whitespace-pre-wrap break-words">{r.question_text}</p>
+                      <div className="text-sm font-medium text-gray-800 leading-snug whitespace-pre-wrap break-words">
+                        <KeywordText text={r.question_text} enabled={settings.highlightKeywords} />
+                      </div>
                       {r.image_url && (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={r.image_url} alt="Exhibit" className="w-full rounded-lg border border-gray-100 mt-2" />

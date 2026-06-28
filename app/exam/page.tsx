@@ -2,14 +2,35 @@
 import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useSettings, tapFeedback } from '@/lib/settings'
+import { useSettings, tapFeedback, readStored } from '@/lib/settings'
 import {
   SESSION_META_KEY, SESSION_STATE_KEY, readSession, clearSession,
   type SessionMeta, type SessionState,
 } from '@/lib/session'
+import { readDeck } from '@/lib/deck'
+import { fetchBookmarkIds, addBookmark, removeBookmark } from '@/lib/bookmarks'
+import KeywordText from '@/components/KeywordText'
 import type { Question, ExamMode, ExamAnswer } from '@/lib/types'
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+
+// Shuffle a question's answer options and remap which indices are correct, so the
+// right answer isn't always the same letter. Returns a NEW question object — the
+// original bank is untouched. Resume is safe because the shuffled question is what
+// gets persisted to the session. True/False is left in its natural order.
+function shuffleOptions(q: Question): Question {
+  if (q.question_type === 'truefalse' || q.options.length < 2) return q
+  const order = q.options.map((_, i) => i)
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[order[i], order[j]] = [order[j], order[i]]
+  }
+  return {
+    ...q,
+    options: order.map(i => q.options[i]),
+    correct_indices: q.correct_indices.map(c => order.indexOf(c)).sort((a, b) => a - b),
+  }
+}
 
 type CustomConfig = {
   from: number; to: number; timeLimit: number | null; shuffle: boolean
@@ -19,6 +40,7 @@ function ExamSetup({ questions, mode, onStart }: {
   questions: Question[]; mode: ExamMode;
   onStart: (qs: Question[], config: CustomConfig) => void
 }) {
+  const { settings } = useSettings()
   const [from, setFrom] = useState(1)
   const [to, setTo] = useState(Math.min(10, questions.length))
   const [timeLimit, setTimeLimit] = useState<number | null>(90)
@@ -30,7 +52,8 @@ function ExamSetup({ questions, mode, onStart }: {
   function start() {
     const slice = questions.slice(from - 1, to)
     const ordered = shuffle ? [...slice].sort(() => Math.random() - 0.5) : slice
-    onStart(ordered, { from, to, timeLimit: hasLimit ? timeLimit : null, shuffle })
+    const final = settings.shuffleOptions ? ordered.map(shuffleOptions) : ordered
+    onStart(final, { from, to, timeLimit: hasLimit ? timeLimit : null, shuffle })
   }
 
   if (mode === 'practice') {
@@ -159,6 +182,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState 
   const [elapsed, setElapsed] = useState(resumeState?.elapsed ?? 0)
   const [showTimeWarning, setShowTimeWarning] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [bookmarks, setBookmarks] = useState<Set<string>>(new Set())
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const questionStartRef = useRef(Date.now())
   const warnedRef = useRef(false)
@@ -167,6 +191,21 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState 
   const answer = answers[current]
   const isMultiple = q.question_type === 'multiple'
   const isLearning = mode === 'learning'
+
+  // Load this user's starred questions so the ⭐ shows the right state.
+  useEffect(() => { fetchBookmarkIds().then(setBookmarks) }, [])
+
+  function toggleStar() {
+    const id = q.id
+    const has = bookmarks.has(id)
+    tapFeedback(settings.feedback)
+    setBookmarks(prev => {
+      const n = new Set(prev)
+      if (has) n.delete(id); else n.add(id)
+      return n
+    })
+    if (has) removeBookmark(id); else addBookmark(id, bankId || null)
+  }
 
   // --- Save the in-progress exam so it survives a refresh / disconnect ---
   // Write the static META once. (resumeState means it's already stored.)
@@ -465,11 +504,18 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState 
             }`}>
               {q.question_type === 'multiple' ? 'Multiple answer' : q.question_type === 'truefalse' ? 'True / False' : 'Single answer'}
             </span>
-            <button onClick={toggleFlag} className="ml-auto text-lg active:scale-95">
-              {answer.flagged ? '🚩' : '⚑'}
-            </button>
+            <div className="ml-auto flex items-center gap-3">
+              <button onClick={toggleStar} className="text-lg active:scale-95" title="Bookmark this question">
+                {bookmarks.has(q.id) ? '⭐' : '☆'}
+              </button>
+              <button onClick={toggleFlag} className="text-lg active:scale-95" title="Flag for review">
+                {answer.flagged ? '🚩' : '⚑'}
+              </button>
+            </div>
           </div>
-          <p className="text-gray-900 text-base leading-relaxed font-medium whitespace-pre-wrap break-words">{q.question_text}</p>
+          <div className="text-gray-900 text-base leading-relaxed font-medium whitespace-pre-wrap break-words">
+            <KeywordText text={q.question_text} enabled={settings.highlightKeywords} />
+          </div>
           {q.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={q.image_url} alt="Exhibit" className="w-full rounded-xl border border-gray-100 mt-3" />
@@ -582,6 +628,7 @@ function ExamContent() {
   const bankName = params.get('bankName') || ''
   const mode = (params.get('mode') || 'practice') as ExamMode
   const isResume = params.get('resume') === '1'
+  const isDeck = params.get('deck') === '1'
   const supabase = createClient()
 
   useEffect(() => {
@@ -603,12 +650,24 @@ function ExamContent() {
         // Saved session gone — fall through to a normal fresh start.
       }
 
+      // Study deck (wrong-answers / starred) — questions come from sessionStorage,
+      // not a bank. Runs like Learning mode (instant feedback + explanation).
+      if (isDeck) {
+        const qs = readDeck()
+        if (qs.length === 0) { alert('This study deck is empty.'); router.push('/study'); return }
+        setExamQuestions(readStored().shuffleOptions ? qs.map(shuffleOptions) : qs)
+        setSetupDone(true)
+        setLoading(false)
+        return
+      }
+
       const { data } = await supabase.from('questions').select('*').eq('bank_id', bankId).order('order_index')
       if (!data || data.length === 0) { alert('No questions in this bank.'); router.push('/dashboard'); return }
       setAllQuestions(data as Question[])
       // Learning mode starts immediately with all questions
       if (mode === 'learning') {
-        setExamQuestions(data as Question[])
+        const qs = data as Question[]
+        setExamQuestions(readStored().shuffleOptions ? qs.map(shuffleOptions) : qs)
         setSetupDone(true)
       }
       setLoading(false)

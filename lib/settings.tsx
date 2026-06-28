@@ -11,6 +11,8 @@ export type Settings = {
   defaultMode: ExamMode | 'ask'   // 'ask' = don't pre-select a mode
   hideTimer: boolean
   feedback: boolean               // tap sound + haptic vibration
+  shuffleOptions: boolean         // randomize answer-choice order (A–D) each exam
+  highlightKeywords: boolean      // highlight AWS exam trigger words with tap-to-hint
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -19,11 +21,13 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultMode: 'ask',
   hideTimer: false,
   feedback: true,
+  shuffleOptions: false,
+  highlightKeywords: true,
 }
 
 const STORAGE_KEY = 'examprep_settings'
 
-function readStored(): Settings {
+export function readStored(): Settings {
   if (typeof window === 'undefined') return DEFAULT_SETTINGS
   try {
     const raw = localStorage.getItem(STORAGE_KEY)

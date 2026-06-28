@@ -134,6 +134,16 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Study tools — wrong-answer & starred decks */}
+        <Link href="/study" className="card flex items-center gap-3 active:scale-[0.98] transition-transform">
+          <span className="text-2xl">🎯</span>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-gray-900 text-sm">Study tools</p>
+            <p className="text-xs text-gray-400">Review wrong answers & starred questions</p>
+          </div>
+          <span className="text-brand-600 text-lg">→</span>
+        </Link>
+
         {/* Bank picker */}
         <div>
           <h2 className="text-sm font-semibold text-gray-600 mb-2">1. Choose a question bank</h2>

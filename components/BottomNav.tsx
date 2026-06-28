@@ -14,14 +14,17 @@ const adminTabs = [
   { href: '/admin/students', label: 'Students', icon: '👥' },
 ]
 
+const studyTab = { href: '/study', label: 'Study', icon: '🎯' }
 const settingsTab = { href: '/settings', label: 'Settings', icon: '⚙️' }
 
 export default function BottomNav() {
   const pathname = usePathname()
   const { isAdmin } = useUserRole()
+  // Admins already have many tabs (Banks/Questions/Students); they reach Study via
+  // the Home screen card instead, to keep the bar from overflowing.
   const tabs = isAdmin
     ? [...baseTabs, ...adminTabs, settingsTab]
-    : [...baseTabs, settingsTab]
+    : [...baseTabs, studyTab, settingsTab]
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex z-50">

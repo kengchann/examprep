@@ -99,6 +99,20 @@ export default function SettingsPage() {
               </div>
               <Toggle on={settings.hideTimer} onChange={v => update({ hideTimer: v })} />
             </label>
+            <label className="flex items-center justify-between gap-3 cursor-pointer">
+              <div>
+                <span className="text-sm font-medium text-gray-800">Shuffle answer choices</span>
+                <p className="text-xs text-gray-400">Randomize A–D each exam so you learn the answer, not the letter.</p>
+              </div>
+              <Toggle on={settings.shuffleOptions} onChange={v => update({ shuffleOptions: v })} />
+            </label>
+            <label className="flex items-center justify-between gap-3 cursor-pointer">
+              <div>
+                <span className="text-sm font-medium text-gray-800">Highlight keywords</span>
+                <p className="text-xs text-gray-400">Mark AWS trigger phrases in questions — tap one for a hint. Turn off for realistic practice.</p>
+              </div>
+              <Toggle on={settings.highlightKeywords} onChange={v => update({ highlightKeywords: v })} />
+            </label>
           </div>
         </section>
 
