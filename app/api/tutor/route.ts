@@ -81,7 +81,8 @@ export async function POST(req: NextRequest) {
       const msg = r.status === 429
         ? 'The AI tutor is busy (free-tier rate limit). Try again in a moment.'
         : 'The AI tutor had a problem. Please try again.'
-      return NextResponse.json({ error: msg }, { status: 502 })
+      // TEMP diagnostic: surface upstream status + snippet so we can see the cause.
+      return NextResponse.json({ error: msg, upstreamStatus: r.status, detail: detail.slice(0, 400) }, { status: 502 })
     }
     const data = await r.json()
     const parts = data?.candidates?.[0]?.content?.parts ?? []
