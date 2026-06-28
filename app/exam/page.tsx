@@ -11,6 +11,7 @@ import { readDeck } from '@/lib/deck'
 import { fetchBookmarkIds, addBookmark, removeBookmark } from '@/lib/bookmarks'
 import { fetchHighlightMap, saveHighlights } from '@/lib/highlights'
 import KeywordText from '@/components/KeywordText'
+import TutorChat, { type TutorContext } from '@/components/TutorChat'
 import type { Question, ExamMode, ExamAnswer } from '@/lib/types'
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
@@ -210,6 +211,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
   const [bookmarks, setBookmarks] = useState<Set<string>>(new Set())
   const [keywordOn, setKeywordOn] = useState(keywordInit)
   const [highlights, setHighlights] = useState<Map<string, string[]>>(new Map())
+  const [tutor, setTutor] = useState<TutorContext | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const questionStartRef = useRef(Date.now())
   const warnedRef = useRef(false)
@@ -606,6 +608,22 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
           </div>
         )}
 
+        {/* Discuss with AI (learning mode, once answer is revealed) */}
+        {isLearning && confirmed && (
+          <button
+            onClick={() => setTutor({
+              question_text: q.question_text,
+              options: q.options,
+              correct_indices: q.correct_indices,
+              selected_indices: answer.selectedIndices,
+              topic: q.topic,
+              explanation: q.explanation,
+            })}
+            className="mt-3 text-sm font-medium text-brand-600 border border-brand-200 rounded-xl px-3 py-2 active:scale-95">
+            💬 Discuss with AI
+          </button>
+        )}
+
         {/* Action buttons */}
         <div className="mt-5 pb-4 space-y-2">
           {!confirmed ? (
@@ -674,6 +692,8 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
           </div>
         </div>
       )}
+
+      {tutor && <TutorChat context={tutor} onClose={() => setTutor(null)} />}
     </div>
   )
 }
