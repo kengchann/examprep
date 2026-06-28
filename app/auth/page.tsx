@@ -18,7 +18,7 @@ export default function AuthPage() {
     e.preventDefault()
     setLoading(true); setError(''); setMessage('')
     if (mode === 'signup') {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email, password,
         options: {
           data: { full_name: name },
@@ -28,7 +28,13 @@ export default function AuthPage() {
         },
       })
       if (error) setError(error.message)
-      else setMessage('Account created! Check your email to confirm, then log in.')
+      else if (data.session) {
+        // Email confirmation is OFF → user is signed in right away.
+        router.push('/dashboard'); router.refresh()
+      } else {
+        // Email confirmation is ON → they must confirm before logging in.
+        setMessage('Account created! Check your email to confirm, then log in.')
+      }
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) setError('Incorrect email or password.')
