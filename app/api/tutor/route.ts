@@ -4,7 +4,9 @@ import { NextRequest, NextResponse } from 'next/server'
 // Uses the free Gemini API (GEMINI_API_KEY). Server-side only so the key is
 // never exposed to the browser.
 
-const MODEL = 'gemini-3-flash-preview'
+// GA Flash model — stable and well within the free tier. (Preview models like
+// gemini-3-flash-preview work too but get overloaded / rate-limited more often.)
+const MODEL = 'gemini-2.5-flash'
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
 type TutorContext = {
@@ -67,21 +69,35 @@ export async function POST(req: NextRequest) {
   const payload = {
     systemInstruction: { parts: [{ text: buildSystemPrompt(context) }] },
     contents: messages.map(m => ({ role: m.role, parts: [{ text: m.text }] })),
-    generationConfig: { maxOutputTokens: 1500, temperature: 0.7 },
+    // thinkingBudget: 0 keeps replies fast and prevents "thinking" from eating
+    // the output budget. temperature for a little warmth.
+    generationConfig: { maxOutputTokens: 1200, temperature: 0.7, thinkingConfig: { thinkingBudget: 0 } },
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
   try {
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify(payload),
-    })
-    if (!r.ok) {
-      const detail = await r.text()
-      console.error('Gemini error:', r.status, detail)
-      const msg = r.status === 429
-        ? 'The AI tutor is busy (free-tier rate limit). Try again in a moment.'
+    // Retry transient overload / rate-limit responses (429/500/503) a couple of times.
+    let r: Response | null = null
+    for (let attempt = 0; attempt < 3; attempt++) {
+      r = await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+        body: JSON.stringify(payload),
+      })
+      if (r.ok) break
+      if ([429, 500, 503].includes(r.status) && attempt < 2) {
+        await r.text().catch(() => {})   // drain body before retrying
+        await new Promise(res => setTimeout(res, 700 * (attempt + 1)))
+        continue
+      }
+      break
+    }
+    if (!r || !r.ok) {
+      const status = r?.status ?? 0
+      const detail = r ? await r.text().catch(() => '') : ''
+      console.error('Gemini error:', status, detail)
+      const msg = status === 429 || status === 503 || status === 500
+        ? 'The AI tutor is busy right now — please try again in a few seconds.'
         : 'The AI tutor had a problem. Please try again.'
       return NextResponse.json({ error: msg }, { status: 502 })
     }
