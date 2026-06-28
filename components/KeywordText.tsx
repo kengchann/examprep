@@ -69,29 +69,30 @@ export default function KeywordText({
     <>
       <span ref={ref} onMouseUp={onSelectEnd} onTouchEnd={onSelectEnd}>
         {segs.map((s, i) => {
+          // NOTE: these are <span>, not <button>, so they can be embedded inside
+          // the answer-option buttons without invalid nested-button markup.
           if (s.kind === 'personal') {
+            const removable = !!onRemoveHighlight
             return (
-              <button
+              <span
                 key={i}
-                type="button"
-                onClick={e => { e.stopPropagation(); onRemoveHighlight?.(s.text) }}
-                title="Tap to remove your highlight"
-                className="align-baseline rounded bg-yellow-200 text-yellow-900"
+                onClick={removable ? (e => { e.stopPropagation(); onRemoveHighlight!(s.text) }) : undefined}
+                title={removable ? 'Tap to remove your highlight' : undefined}
+                className={`rounded bg-yellow-200 text-yellow-900 ${removable ? 'cursor-pointer' : ''}`}
               >
                 {s.text}
-              </button>
+              </span>
             )
           }
           if (s.kind === 'keyword') {
             return (
-              <button
+              <span
                 key={i}
-                type="button"
                 onClick={e => { e.stopPropagation(); setHint({ phrase: s.text, hint: s.hint! }) }}
-                className="align-baseline rounded bg-amber-100 text-amber-900 px-0.5 underline decoration-dotted decoration-amber-400 underline-offset-2"
+                className="cursor-pointer rounded bg-amber-100 text-amber-900 px-0.5 underline decoration-dotted decoration-amber-400 underline-offset-2"
               >
                 {s.text}
-              </button>
+              </span>
             )
           }
           return <span key={i}>{s.text}</span>

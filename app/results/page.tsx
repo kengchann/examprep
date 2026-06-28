@@ -255,7 +255,15 @@ function ResultsContent() {
                         'text-gray-400'
                       }`}>
                         <span className="font-bold flex-shrink-0">{OPTION_LABELS[j]}.</span>
-                        <span className="flex-1 whitespace-pre-wrap break-words">{opt}</span>
+                        <span className="flex-1 whitespace-pre-wrap break-words">
+                          <KeywordText
+                            text={opt}
+                            enabled={settings.highlightKeywords}
+                            personal={highlights.get(r.questionId) ?? []}
+                            onAddHighlight={phrase => addHighlight(r.questionId, phrase)}
+                            onRemoveHighlight={phrase => removeHighlight(r.questionId, phrase)}
+                          />
+                        </span>
                         {r.correct_indices.includes(j) && <span className="flex-shrink-0">✓</span>}
                         {r.selected_indices.includes(j) && !r.correct_indices.includes(j) && <span className="flex-shrink-0">✗</span>}
                       </div>

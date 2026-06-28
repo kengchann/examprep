@@ -535,7 +535,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
               {q.question_type === 'multiple' ? 'Multiple answer' : q.question_type === 'truefalse' ? 'True / False' : 'Single answer'}
             </span>
             <div className="ml-auto flex items-center gap-3">
-              <button onClick={() => setKeywordOn(v => !v)} className={`text-lg active:scale-95 ${keywordOn ? '' : 'opacity-30 grayscale'}`} title="Toggle keyword hints">
+              <button onClick={() => setKeywordOn(v => !v)} className={`text-lg active:scale-95 ${keywordOn ? '' : 'opacity-30 grayscale'}`} title="Toggle highlights (keywords + your own)">
                 🔆
               </button>
               <button onClick={toggleStar} className="text-lg active:scale-95" title="Bookmark this question">
@@ -550,9 +550,9 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
             <KeywordText
               text={q.question_text}
               enabled={keywordOn}
-              personal={highlights.get(q.id) ?? []}
-              onAddHighlight={addHighlight}
-              onRemoveHighlight={removeHighlight}
+              personal={keywordOn ? (highlights.get(q.id) ?? []) : []}
+              onAddHighlight={keywordOn ? addHighlight : undefined}
+              onRemoveHighlight={keywordOn ? removeHighlight : undefined}
             />
           </div>
           {q.image_url && (
@@ -568,7 +568,15 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
               <span className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold mt-0.5 border-2 ${circleSyle(i)}`}>
                 {OPTION_LABELS[i] || i}
               </span>
-              <span className="text-sm leading-relaxed whitespace-pre-wrap break-words">{opt}</span>
+              <span className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                <KeywordText
+                  text={opt}
+                  enabled={keywordOn}
+                  personal={keywordOn ? (highlights.get(q.id) ?? []) : []}
+                  onAddHighlight={keywordOn ? addHighlight : undefined}
+                  onRemoveHighlight={keywordOn ? removeHighlight : undefined}
+                />
+              </span>
               {confirmed && q.correct_indices.includes(i) && <span className="ml-auto text-green-600 flex-shrink-0">✓</span>}
             </button>
           ))}
