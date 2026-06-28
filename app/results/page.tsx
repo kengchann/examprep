@@ -5,6 +5,7 @@ import { useSettings, tapFeedback } from '@/lib/settings'
 import { fetchBookmarkIds, addBookmark, removeBookmark } from '@/lib/bookmarks'
 import { fetchHighlightMap, saveHighlights } from '@/lib/highlights'
 import KeywordText from '@/components/KeywordText'
+import TutorChat, { type TutorContext } from '@/components/TutorChat'
 import type { AttemptResult } from '@/lib/types'
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
@@ -32,6 +33,9 @@ function ResultsContent() {
     })
     if (has) removeBookmark(questionId); else addBookmark(questionId, null)
   }
+
+  // AI tutor — which question's chat is open (null = closed).
+  const [tutor, setTutor] = useState<TutorContext | null>(null)
 
   // Personal text highlights, so review matches what you marked during the exam.
   const [highlights, setHighlights] = useState<Map<string, string[]>>(new Map())
@@ -275,12 +279,28 @@ function ResultsContent() {
                       <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap break-words">{r.explanation}</p>
                     </div>
                   )}
+                  <div className="mt-3 pl-7">
+                    <button
+                      onClick={() => setTutor({
+                        question_text: r.question_text,
+                        options: r.options,
+                        correct_indices: r.correct_indices,
+                        selected_indices: r.selected_indices,
+                        topic: r.topic,
+                        explanation: r.explanation,
+                      })}
+                      className="text-xs font-medium text-brand-600 border border-brand-200 rounded-lg px-3 py-1.5 active:scale-95">
+                      💬 Discuss with AI
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
       </div>
+
+      {tutor && <TutorChat context={tutor} onClose={() => setTutor(null)} />}
     </div>
   )
 }
