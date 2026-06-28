@@ -19,7 +19,13 @@ export default function AuthPage() {
     setLoading(true); setError(''); setMessage('')
     if (mode === 'signup') {
       const { error } = await supabase.auth.signUp({
-        email, password, options: { data: { full_name: name } }
+        email, password,
+        options: {
+          data: { full_name: name },
+          // Send the confirmation link back to whatever site they signed up from
+          // (production or localhost) instead of Supabase's default Site URL.
+          emailRedirectTo: `${window.location.origin}/auth`,
+        },
       })
       if (error) setError(error.message)
       else setMessage('Account created! Check your email to confirm, then log in.')
