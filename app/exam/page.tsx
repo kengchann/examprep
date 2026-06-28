@@ -301,6 +301,9 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
   function toggleSelect(i: number) {
     if (confirmed && !isLearning) return
     if (isLearning && confirmed) return
+    // If the user just drag-selected text (to make a highlight), don't also
+    // select this option as the answer.
+    if (keywordOn && (window.getSelection()?.toString().trim().length ?? 0) > 0) return
     tapFeedback(settings.feedback)
     setAnswers(prev => {
       const updated = [...prev]
@@ -568,7 +571,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
               <span className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold mt-0.5 border-2 ${circleSyle(i)}`}>
                 {OPTION_LABELS[i] || i}
               </span>
-              <span className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+              <span className="text-sm leading-relaxed whitespace-pre-wrap break-words select-text">
                 <KeywordText
                   text={opt}
                   enabled={keywordOn}
