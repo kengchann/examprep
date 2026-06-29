@@ -227,9 +227,9 @@ function ExamSetup({ questions, mode, onStart }: {
   return null
 }
 
-function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState, keywordInit }: {
+function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState, keywordInit, focus }: {
   questions: Question[]; mode: ExamMode; bankId: string; bankName: string; timeLimit: number | null
-  resumeState?: SessionState | null; keywordInit: boolean
+  resumeState?: SessionState | null; keywordInit: boolean; focus?: boolean
 }) {
   const router = useRouter()
   const supabase = createClient()
@@ -548,12 +548,16 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-4 pt-12 pb-2 sticky top-0 z-10">
         <div className="flex items-center justify-between mb-2">
-          <button onClick={() => setPaused(true)} className="text-gray-400 text-sm active:scale-95">⏸ Pause</button>
-          <button onClick={() => setShowNav(true)} className="text-sm font-medium text-brand-600 active:scale-95">
-            {current + 1}/{questions.length}
-            {flaggedCount > 0 && <span className="ml-1 text-amber-500">🚩{flaggedCount}</span>}
-          </button>
-          {settings.hideTimer ? (
+          <button onClick={() => setPaused(true)} className="text-gray-400 text-sm active:scale-95">{focus ? '✕ Exit' : '⏸ Pause'}</button>
+          {focus ? (
+            <span className="text-sm font-medium text-gray-500">{current + 1} of {questions.length}</span>
+          ) : (
+            <button onClick={() => setShowNav(true)} className="text-sm font-medium text-brand-600 active:scale-95">
+              {current + 1}/{questions.length}
+              {flaggedCount > 0 && <span className="ml-1 text-amber-500">🚩{flaggedCount}</span>}
+            </button>
+          )}
+          {focus || settings.hideTimer ? (
             <span className="w-12" />
           ) : secondsLeft !== null ? (
             <span className={`text-sm font-bold ${lowTime ? 'text-red-500 animate-pulse' : 'text-gray-600'}`}>
@@ -753,6 +757,7 @@ function ExamContent() {
   const mode = (params.get('mode') || 'practice') as ExamMode
   const isResume = params.get('resume') === '1'
   const isDeck = params.get('deck') === '1'
+  const isSprint = params.get('sprint') === '1'
   const supabase = createClient()
 
   useEffect(() => {
@@ -812,7 +817,7 @@ function ExamContent() {
     )
   }
 
-  return <ExamRunner questions={examQuestions} mode={mode} bankId={bankId} bankName={bankName} timeLimit={timeLimit} resumeState={resumeState} keywordInit={keyword} />
+  return <ExamRunner questions={examQuestions} mode={mode} bankId={bankId} bankName={bankName} timeLimit={timeLimit} resumeState={resumeState} keywordInit={keyword} focus={isSprint} />
 }
 
 export default function ExamPage() {

@@ -117,3 +117,33 @@ export async function buildWeakDeck(count: number): Promise<{ deck: Question[]; 
   }
   return { deck, topics: weak }
 }
+
+// Build a short Daily Sprint deck: weak-area questions first (wrong/unseen
+// prioritized), then filled with unseen bank questions in order. New users with
+// no history simply get the first `count` questions. Pure data — no AI.
+export async function buildSprintDeck(count = 7): Promise<Question[]> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+
+  const { topics, wrongIds, seenIds } = await gatherHistory()
+  const chosen: Question[] = []
+  const have = new Set<string>()
+  const add = (q: Question) => { if (!have.has(q.id) && chosen.length < count) { chosen.push(q); have.add(q.id) } }
+
+  // 1) Weak-topic questions first.
+  const weakNames = topics.filter(t => t.weakness > 0.001).slice(0, MAX_TOPICS).map(t => t.topic)
+  if (weakNames.length) {
+    const { data } = await supabase.from('questions').select('*').in('topic', weakNames)
+    for (const q of prioritize((data ?? []) as Question[], wrongIds, seenIds)) add(q)
+  }
+
+  // 2) Fill from the bank — unseen (in order) first, then anything left.
+  if (chosen.length < count) {
+    const { data } = await supabase.from('questions').select('*').order('order_index').limit(400)
+    const pool = (data ?? []) as Question[]
+    for (const q of pool) if (!seenIds.has(q.id)) add(q)
+    for (const q of pool) add(q)
+  }
+  return chosen.slice(0, count)
+}

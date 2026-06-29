@@ -7,6 +7,9 @@ import Link from 'next/link'
 import { useUserRole } from '@/lib/useUserRole'
 import { useSettings } from '@/lib/settings'
 import { readSession, clearSession } from '@/lib/session'
+import { setDeck } from '@/lib/deck'
+import { buildSprintDeck } from '@/lib/weakAreas'
+import { getSprintStatus, SPRINT_BANK_NAME, SPRINT_SIZE } from '@/lib/sprint'
 import type { QuestionBank, ExamMode } from '@/lib/types'
 
 const categoryIcon: Record<string, string> = { IT: '💻', Academic: '📖', Other: '📝' }
@@ -26,8 +29,25 @@ export default function Dashboard() {
   const { isAdmin, isTrial } = useUserRole()
   const { settings } = useSettings()
   const [resume, setResume] = useState<{ bankId: string; bankName: string; mode: ExamMode; answered: number; total: number } | null>(null)
+  const [sprint, setSprint] = useState<{ streak: number; doneToday: boolean } | null>(null)
+  const [sprintBuilding, setSprintBuilding] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+
+  // Daily Sprint status (streak + done-today) — derived from existing attempts.
+  useEffect(() => {
+    getSprintStatus().then(setSprint).catch(() => setSprint({ streak: 0, doneToday: false }))
+  }, [])
+
+  async function startSprint() {
+    setSprintBuilding(true)
+    const deck = await buildSprintDeck(SPRINT_SIZE)
+    setSprintBuilding(false)
+    if (deck.length === 0) { alert('No questions available for a sprint yet.'); return }
+    setDeck(deck)
+    const params = new URLSearchParams({ mode: 'learning', deck: '1', sprint: '1', bankName: SPRINT_BANK_NAME })
+    router.push(`/exam?${params}`)
+  }
 
   // Honor the user's preferred default exam mode (Settings).
   useEffect(() => {
@@ -113,6 +133,40 @@ export default function Dashboard() {
       </div>
 
       <div className="px-4 pt-5 space-y-5">
+        {/* Daily Sprint — one calm, finishable session */}
+        {sprint && (
+          sprint.doneToday ? (
+            <div className="card border-green-200 bg-green-50">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">✅</span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-green-900 text-sm">Sprint done today!</p>
+                  <p className="text-xs text-green-700">
+                    {sprint.streak > 0 ? `🔥 ${sprint.streak}-day streak · ` : ''}Come back tomorrow to keep it going.
+                  </p>
+                </div>
+                <button onClick={startSprint} disabled={sprintBuilding} className="text-xs font-medium text-green-700 underline disabled:opacity-50">
+                  {sprintBuilding ? '…' : 'Bonus'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="card border-brand-200">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-2xl">🎯</span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-900">Today&apos;s Sprint</p>
+                  <p className="text-xs text-gray-500">{SPRINT_SIZE} questions · ~5 min · focuses your weak spots</p>
+                </div>
+                {sprint.streak > 0 && <span className="text-sm font-bold text-amber-500 flex-shrink-0">🔥 {sprint.streak}</span>}
+              </div>
+              <button onClick={startSprint} disabled={sprintBuilding} className="btn-primary text-sm py-3 disabled:opacity-60">
+                {sprintBuilding ? 'Building your sprint…' : 'Start sprint →'}
+              </button>
+            </div>
+          )
+        )}
+
         {/* Free-trial notice */}
         {isTrial && (
           <div className="card border-amber-200 bg-amber-50">
