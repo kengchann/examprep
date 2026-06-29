@@ -487,7 +487,8 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
     }
 
     const params = new URLSearchParams({ bankName, mode, elapsed: elapsed.toString() })
-    router.push(`/results?${params}`)
+    // Sprints get a calm recap; everything else gets the full results screen.
+    router.push(`${focus ? '/sprint-done' : '/results'}?${params}`)
   }
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
