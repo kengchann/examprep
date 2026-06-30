@@ -357,6 +357,24 @@ END; $$;
 GRANT EXECUTE ON FUNCTION public.set_user_tier(uuid, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.set_user_role(uuid, text) TO authenticated;
 
+-- ============================================
+-- v2.8 — Shared Insight-Card cache (generate once per question, reuse for all)
+-- The AI tutor card depends only on the question, so it's cached globally and
+-- served free/instant after the first generation.
+-- ============================================
+CREATE TABLE IF NOT EXISTS question_cards (
+  question_id UUID PRIMARY KEY REFERENCES questions(id) ON DELETE CASCADE,
+  card JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE question_cards ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone authenticated can read cards" ON question_cards;
+CREATE POLICY "Anyone authenticated can read cards" ON question_cards
+  FOR SELECT USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Anyone authenticated can add cards" ON question_cards;
+CREATE POLICY "Anyone authenticated can add cards" ON question_cards
+  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
 -- 👑 MAKE YOURSELF SUPERADMIN — run this once with your login email:
 -- UPDATE public.profiles SET role = 'superadmin' WHERE email = 'kengchann@gmail.com';
 

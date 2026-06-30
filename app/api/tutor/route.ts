@@ -1,4 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+
+// Cookie-authenticated Supabase client (runs as the logged-in user → satisfies
+// the question_cards RLS policies for read/insert).
+function serverClient() {
+  const store = cookies()
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (n: string) => store.get(n)?.value, set() {}, remove() {} } }
+  )
+}
 
 // AI Study Assistant — structured "Insight Card" + focused follow-ups.
 // Google Gemini (free tier). Server-side only so the key is never exposed.
@@ -8,6 +21,7 @@ const MODEL = 'gemini-2.5-flash'   // GA Flash: stable, free-tier friendly
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
 type Ctx = {
+  question_id?: string      // stable id → used as the shared-cache key
   question_text: string
   options: string[]
   correct_indices: number[]
@@ -132,6 +146,15 @@ export async function POST(req: NextRequest) {
   }
 
   // ---- Insight Card (structured JSON) ----
+  // Shared cache: a card depends only on the question, so generate once and
+  // reuse for every student. Keyed by question_id.
+  const qid = context.question_id
+  const sb = qid ? serverClient() : null
+  if (sb && qid) {
+    const { data: cached } = await sb.from('question_cards').select('card').eq('question_id', qid).maybeSingle()
+    if (cached?.card) return NextResponse.json({ card: cached.card, cached: true })
+  }
+
   const body = {
     systemInstruction: { parts: [{ text: cardSystem(context) }] },
     contents: [{ role: 'user', parts: [{ text: 'Generate the insight card as JSON.' }] }],
@@ -149,6 +172,12 @@ export async function POST(req: NextRequest) {
   const raw = (data?.candidates?.[0]?.content?.parts ?? []).map((p: { text?: string }) => p.text || '').join('').trim()
   try {
     const parsed = JSON.parse(raw)
+    // Save to the shared cache so the next student (or revisit) is free + instant.
+    if (sb && qid) {
+      try {
+        await sb.from('question_cards').upsert({ question_id: qid, card: parsed }, { onConflict: 'question_id', ignoreDuplicates: true })
+      } catch { /* cache write is best-effort */ }
+    }
     return NextResponse.json({ card: parsed })
   } catch {
     console.error('Card parse failed:', raw.slice(0, 300))

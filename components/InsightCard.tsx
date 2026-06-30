@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 export type TutorContext = {
+  question_id?: string
   question_text: string
   options: string[]
   correct_indices: number[]

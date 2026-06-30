@@ -660,6 +660,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
         {isLearning && confirmed && (
           <button
             onClick={() => setTutor({
+              question_id: q.id,
               question_text: q.question_text,
               options: q.options,
               correct_indices: q.correct_indices,

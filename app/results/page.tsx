@@ -282,6 +282,7 @@ function ResultsContent() {
                   <div className="mt-3 pl-7">
                     <button
                       onClick={() => setTutor({
+                        question_id: r.questionId,
                         question_text: r.question_text,
                         options: r.options,
                         correct_indices: r.correct_indices,
