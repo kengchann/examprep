@@ -8,6 +8,7 @@ import {
   type SessionMeta, type SessionState,
 } from '@/lib/session'
 import { readDeck } from '@/lib/deck'
+import { applyResults as applySrs } from '@/lib/srs'
 import { fetchBookmarkIds, addBookmark, removeBookmark } from '@/lib/bookmarks'
 import { fetchHighlightMap, saveHighlights } from '@/lib/highlights'
 import KeywordText from '@/components/KeywordText'
@@ -227,9 +228,9 @@ function ExamSetup({ questions, mode, onStart }: {
   return null
 }
 
-function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState, keywordInit, focus }: {
+function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState, keywordInit, focus, srs }: {
   questions: Question[]; mode: ExamMode; bankId: string; bankName: string; timeLimit: number | null
-  resumeState?: SessionState | null; keywordInit: boolean; focus?: boolean
+  resumeState?: SessionState | null; keywordInit: boolean; focus?: boolean; srs?: boolean
 }) {
   const router = useRouter()
   const supabase = createClient()
@@ -452,6 +453,8 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
         correct, flagged: a.flagged, skipped: a.skipped,
       }
     })
+    // Spaced-repetition: reschedule each reviewed question (Review Queue only).
+    if (srs) applySrs(results.map(r => ({ questionId: r.questionId, correct: r.correct })))
     // Save to localStorage for history
     const attempt = {
       id: Date.now().toString(),
@@ -759,6 +762,7 @@ function ExamContent() {
   const isResume = params.get('resume') === '1'
   const isDeck = params.get('deck') === '1'
   const isSprint = params.get('sprint') === '1'
+  const isSRS = params.get('srs') === '1'
   const supabase = createClient()
 
   useEffect(() => {
@@ -818,7 +822,7 @@ function ExamContent() {
     )
   }
 
-  return <ExamRunner questions={examQuestions} mode={mode} bankId={bankId} bankName={bankName} timeLimit={timeLimit} resumeState={resumeState} keywordInit={keyword} focus={isSprint} />
+  return <ExamRunner questions={examQuestions} mode={mode} bankId={bankId} bankName={bankName} timeLimit={timeLimit} resumeState={resumeState} keywordInit={keyword} focus={isSprint} srs={isSRS} />
 }
 
 export default function ExamPage() {
