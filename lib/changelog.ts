@@ -1,10 +1,19 @@
 // Bump alongside new changelog entries below.
-export const APP_VERSION = '1.5.0'
+export const APP_VERSION = '1.6.0'
 
 // Maintained by hand — add a new entry whenever a feature ships. Newest first.
 export type ChangeEntry = { date: string; title: string; items: string[] }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-06-30 (2)',
+    title: 'Readiness score, confidence tags & cloud-synced review',
+    items: [
+      'Exam Readiness score on the Mastery page — one number blending your accuracy and how much of the bank you\'ve covered.',
+      'Confidence check while answering (Sure / Not sure / Guessed) — results now flag "overconfident misses" so you can spot the answers you were sure about but got wrong.',
+      'Review Queue (spaced repetition) now syncs through your account, so progress follows you across devices instead of staying on one browser.',
+    ],
+  },
   {
     date: '2026-06-30',
     title: 'My Mistakes deck',
