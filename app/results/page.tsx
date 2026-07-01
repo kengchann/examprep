@@ -6,7 +6,8 @@ import { fetchBookmarkIds, addBookmark, removeBookmark } from '@/lib/bookmarks'
 import { fetchHighlightMap, saveHighlights } from '@/lib/highlights'
 import KeywordText from '@/components/KeywordText'
 import InsightCard, { type TutorContext } from '@/components/InsightCard'
-import type { AttemptResult } from '@/lib/types'
+import { setDeck } from '@/lib/deck'
+import type { AttemptResult, Question } from '@/lib/types'
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
@@ -84,6 +85,21 @@ function ResultsContent() {
 
   const reviewList = showFlagged ? flagged : results
 
+  // Retake only the questions missed (wrong or skipped) in THIS attempt.
+  const mistakes = results.filter(r => !r.correct)
+  function retakeMistakes() {
+    if (mistakes.length === 0) return
+    const deck: Question[] = mistakes.map(r => ({
+      id: r.questionId, bank_id: '', question_text: r.question_text,
+      question_type: r.question_type, options: r.options, correct_indices: r.correct_indices,
+      explanation: r.explanation, topic: r.topic, image_url: r.image_url,
+      order_index: 0, created_at: '',
+    }))
+    setDeck(deck)
+    const params = new URLSearchParams({ mode: 'learning', deck: '1', bankName: `Retake: ${bankName}` })
+    router.push(`/exam?${params}`)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 pb-8">
       {/* Score hero */}
@@ -110,7 +126,7 @@ function ResultsContent() {
         </div>
 
         {/* Action buttons */}
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 mb-2">
           <button onClick={() => router.back()} className="flex-1 bg-brand-600 text-white font-medium py-3 rounded-xl active:scale-95 text-sm">
             Try again
           </button>
@@ -118,6 +134,11 @@ function ResultsContent() {
             Home
           </button>
         </div>
+        {mistakes.length > 0 && (
+          <button onClick={retakeMistakes} className="w-full border border-red-200 bg-red-50 text-red-600 font-medium py-3 rounded-xl active:scale-95 text-sm mb-4">
+            🔁 Retake {mistakes.length} mistake{mistakes.length !== 1 ? 's' : ''}
+          </button>
+        )}
 
         {/* Tabs */}
         <div className="flex bg-gray-200 rounded-xl p-1 mb-4">
