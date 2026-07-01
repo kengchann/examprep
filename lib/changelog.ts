@@ -1,3 +1,6 @@
+// Bump alongside new changelog entries below.
+export const APP_VERSION = '1.5.0'
+
 // Maintained by hand — add a new entry whenever a feature ships. Newest first.
 export type ChangeEntry = { date: string; title: string; items: string[] }
 

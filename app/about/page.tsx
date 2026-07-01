@@ -1,6 +1,6 @@
 'use client'
 import { useRouter } from 'next/navigation'
-import { CHANGELOG } from '@/lib/changelog'
+import { CHANGELOG, APP_VERSION } from '@/lib/changelog'
 
 export default function AboutPage() {
   const router = useRouter()
@@ -20,6 +20,7 @@ export default function AboutPage() {
           <div className="text-4xl mb-1">📋</div>
           <p className="font-semibold text-gray-900">ExamPrep</p>
           <p className="text-xs text-gray-400 mt-0.5">Study smarter, pass sooner.</p>
+          <span className="inline-block mt-2 tag bg-gray-100 text-gray-500 text-xs">Version {APP_VERSION}</span>
         </div>
 
         <div>

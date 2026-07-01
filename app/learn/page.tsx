@@ -6,6 +6,7 @@ import BottomNav from '@/components/BottomNav'
 // adaptive practice. Nothing here replaces Classic Review or Exam Simulation.
 const TILES = [
   { href: '/learn/review', icon: '🔁', title: 'Review Queue', desc: 'Spaced repetition — resurfaces what you\'re about to forget' },
+  { href: '/study/mistakes', icon: '📌', title: 'My Mistakes', desc: 'Auto-collected — stays until you mark it mastered' },
   { href: '/learn/confusion', icon: '🧠', title: 'Confusion Trainer', desc: 'Master commonly-confused services (SQS vs SNS, ALB vs NLB…)' },
   { href: '/learn/trigger', icon: '⚡', title: 'Trigger Trainer', desc: 'Recognize exam keywords → the right service, fast' },
   { href: '/learn/architecture', icon: '🏗️', title: 'Architecture Spotter', desc: 'Which service completes or fixes this design?' },
