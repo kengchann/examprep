@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { fetchBookmarkedQuestions } from '@/lib/bookmarks'
+import { fetchMistakeQuestions } from '@/lib/mistakes'
+import Link from 'next/link'
 import { computeWeakTopics, buildWeakDeck, type TopicStat } from '@/lib/weakAreas'
 import { setDeck } from '@/lib/deck'
 import BottomNav from '@/components/BottomNav'
@@ -47,6 +49,7 @@ export default function StudyPage() {
   const [loading, setLoading] = useState(true)
   const [wrong, setWrong] = useState<Question[]>([])
   const [starred, setStarred] = useState<Question[]>([])
+  const [mistakeCount, setMistakeCount] = useState(0)
   const [weakTopics, setWeakTopics] = useState<TopicStat[]>([])
   const [count, setCount] = useState<number>(20)
   const [building, setBuilding] = useState(false)
@@ -55,10 +58,11 @@ export default function StudyPage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/auth'); return }
-      const [w, s, t] = await Promise.all([buildWrongDeck(), fetchBookmarkedQuestions(), computeWeakTopics()])
+      const [w, s, t, m] = await Promise.all([buildWrongDeck(), fetchBookmarkedQuestions(), computeWeakTopics(), fetchMistakeQuestions()])
       setWrong(w)
       setStarred(s)
       setWeakTopics(t)
+      setMistakeCount(m.length)
       setLoading(false)
     }
     load()
@@ -148,6 +152,21 @@ export default function StudyPage() {
                   </p>
                 </>
               )}
+            </div>
+
+            {/* My Mistakes — persistent, manually-curated deck */}
+            <div className="card">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-2xl">📌</span>
+                <div className="flex-1">
+                  <p className="font-semibold text-gray-900">My Mistakes</p>
+                  <p className="text-xs text-gray-400">Auto-collected · stays until you mark it mastered</p>
+                </div>
+                <span className="text-xl font-bold text-red-500">{mistakeCount}</span>
+              </div>
+              <Link href="/study/mistakes" className="btn-outline text-sm py-3 block text-center">
+                {mistakeCount > 0 ? `Manage ${mistakeCount} question${mistakeCount !== 1 ? 's' : ''} →` : 'View deck →'}
+              </Link>
             </div>
 
             {/* Wrong answers */}

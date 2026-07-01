@@ -375,6 +375,22 @@ DROP POLICY IF EXISTS "Anyone authenticated can add cards" ON question_cards;
 CREATE POLICY "Anyone authenticated can add cards" ON question_cards
   FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
+-- ============================================
+-- v2.9 — "My Mistakes" deck: persistent, user-curated (manual removal only,
+-- never auto-dropped by getting a question right elsewhere).
+-- ============================================
+CREATE TABLE IF NOT EXISTS mistake_bank (
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  question_id UUID REFERENCES questions(id) ON DELETE CASCADE,
+  bank_id UUID REFERENCES question_banks(id) ON DELETE SET NULL,
+  added_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (user_id, question_id)
+);
+ALTER TABLE mistake_bank ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users manage own mistake bank" ON mistake_bank;
+CREATE POLICY "Users manage own mistake bank" ON mistake_bank
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
 -- 👑 MAKE YOURSELF SUPERADMIN — run this once with your login email:
 -- UPDATE public.profiles SET role = 'superadmin' WHERE email = 'kengchann@gmail.com';
 

@@ -10,6 +10,7 @@ import {
 import { readDeck } from '@/lib/deck'
 import { applyResults as applySrs } from '@/lib/srs'
 import { fetchBookmarkIds, addBookmark, removeBookmark } from '@/lib/bookmarks'
+import { addMistake } from '@/lib/mistakes'
 import { fetchHighlightMap, saveHighlights } from '@/lib/highlights'
 import KeywordText from '@/components/KeywordText'
 import InsightCard, { type TutorContext } from '@/components/InsightCard'
@@ -455,6 +456,11 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
     })
     // Spaced-repetition: reschedule each reviewed question (Review Queue only).
     if (srs) applySrs(results.map(r => ({ questionId: r.questionId, correct: r.correct })))
+    // My Mistakes deck: auto-collect anything missed, from any mode. Stays until
+    // the student manually marks it mastered (best-effort, never blocks submit).
+    for (const r of results) {
+      if (!r.correct) addMistake(r.questionId, bankId || null).catch(() => {})
+    }
     // Save to localStorage for history
     const attempt = {
       id: Date.now().toString(),
