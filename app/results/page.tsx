@@ -287,34 +287,54 @@ function ResultsContent() {
                       )}
                     </div>
                   </div>
-                  <div className="space-y-1.5 pl-7">
-                    {r.options.map((opt, j) => (
-                      <div key={j} className={`flex items-start gap-2 text-xs px-3 py-2 rounded-lg ${
-                        r.correct_indices.includes(j) ? 'bg-green-50 text-green-700' :
-                        r.selected_indices.includes(j) ? 'bg-red-50 text-red-600' :
-                        'text-gray-400'
-                      }`}>
-                        <span className="font-bold flex-shrink-0">{OPTION_LABELS[j]}.</span>
-                        <span className="flex-1 whitespace-pre-wrap break-words">
-                          <KeywordText
-                            text={opt}
-                            enabled={settings.highlightKeywords}
-                            personal={highlights.get(r.questionId) ?? []}
-                            onAddHighlight={phrase => addHighlight(r.questionId, phrase)}
-                            onRemoveHighlight={phrase => removeHighlight(r.questionId, phrase)}
-                          />
-                        </span>
-                        {r.correct_indices.includes(j) && <span className="flex-shrink-0">✓</span>}
-                        {r.selected_indices.includes(j) && !r.correct_indices.includes(j) && <span className="flex-shrink-0">✗</span>}
-                      </div>
-                    ))}
-                  </div>
+                  {r.question_type === 'match' ? (
+                    <div className="space-y-1.5 pl-7">
+                      {(r.match_items ?? []).map((item, j) => {
+                        const given = r.match_assignment?.[j] ?? -1
+                        const want = r.match_correct?.[j] ?? -1
+                        const ok = given === want
+                        const bucketName = (idx: number) => idx === -1 ? '(left unassigned)' : (r.match_buckets?.[idx] ?? '?')
+                        return (
+                          <div key={j} className={`text-xs px-3 py-2 rounded-lg ${ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+                            <p className="whitespace-pre-wrap break-words">{item}</p>
+                            <p className="mt-0.5 text-[11px]">
+                              Your answer: {bucketName(given)} {ok ? '✓' : `✗ — correct: ${bucketName(want)}`}
+                            </p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5 pl-7">
+                      {r.options.map((opt, j) => (
+                        <div key={j} className={`flex items-start gap-2 text-xs px-3 py-2 rounded-lg ${
+                          r.correct_indices.includes(j) ? 'bg-green-50 text-green-700' :
+                          r.selected_indices.includes(j) ? 'bg-red-50 text-red-600' :
+                          'text-gray-400'
+                        }`}>
+                          <span className="font-bold flex-shrink-0">{OPTION_LABELS[j]}.</span>
+                          <span className="flex-1 whitespace-pre-wrap break-words">
+                            <KeywordText
+                              text={opt}
+                              enabled={settings.highlightKeywords}
+                              personal={highlights.get(r.questionId) ?? []}
+                              onAddHighlight={phrase => addHighlight(r.questionId, phrase)}
+                              onRemoveHighlight={phrase => removeHighlight(r.questionId, phrase)}
+                            />
+                          </span>
+                          {r.correct_indices.includes(j) && <span className="flex-shrink-0">✓</span>}
+                          {r.selected_indices.includes(j) && !r.correct_indices.includes(j) && <span className="flex-shrink-0">✗</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {r.explanation && (
                     <div className="mt-3 pl-7 border-t border-gray-50 pt-2">
                       <p className="text-xs text-blue-600 font-medium mb-0.5">Explanation</p>
                       <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap break-words">{r.explanation}</p>
                     </div>
                   )}
+                  {r.question_type !== 'match' && (
                   <div className="mt-3 pl-7">
                     <button
                       onClick={() => setTutor({
@@ -330,6 +350,7 @@ function ResultsContent() {
                       💡 See why
                     </button>
                   </div>
+                  )}
                 </div>
               ))}
             </div>

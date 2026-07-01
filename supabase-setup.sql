@@ -409,6 +409,17 @@ DROP POLICY IF EXISTS "Users manage own srs schedule" ON srs_schedule;
 CREATE POLICY "Users manage own srs schedule" ON srs_schedule
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
+-- ============================================
+-- v3.1 — "Match" question type (drag-and-drop matching, e.g. CCNA-style
+-- "match each statement to its category"). Existing single/multiple/truefalse
+-- questions are untouched; these columns are simply unused (null) for them.
+-- ============================================
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS match_items TEXT[];
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS match_buckets TEXT[];
+-- Parallel to match_items: index into match_buckets for the correct bucket,
+-- or -1 if the item is a distractor that should be left unassigned.
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS match_correct INTEGER[];
+
 -- 👑 MAKE YOURSELF SUPERADMIN — run this once with your login email:
 -- UPDATE public.profiles SET role = 'superadmin' WHERE email = 'kengchann@gmail.com';
 

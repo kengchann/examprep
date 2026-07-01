@@ -1,10 +1,19 @@
 // Bump alongside new changelog entries below.
-export const APP_VERSION = '1.6.0'
+export const APP_VERSION = '1.7.0'
 
 // Maintained by hand — add a new entry whenever a feature ships. Newest first.
 export type ChangeEntry = { date: string; title: string; items: string[] }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-06-30 (3)',
+    title: 'Match (drag-and-drop) question type',
+    items: [
+      'New "Match" question type — drag items into the right category, like the matching questions on exams such as CCNA.',
+      'Works with touch and mouse, scored all-or-nothing per question.',
+      'Admins can build match questions from the question editor, and they\'re included in bank backup/restore.',
+    ],
+  },
   {
     date: '2026-06-30 (2)',
     title: 'Readiness score, confidence tags & cloud-synced review',

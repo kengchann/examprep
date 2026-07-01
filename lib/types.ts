@@ -1,4 +1,4 @@
-export type QuestionType = 'single' | 'multiple' | 'truefalse'
+export type QuestionType = 'single' | 'multiple' | 'truefalse' | 'match'
 
 export type ExamMode = 'practice' | 'learning' | 'custom'
 
@@ -14,6 +14,10 @@ export type Question = {
   image_url: string | null    // optional exhibit image (Supabase storage)
   order_index: number
   created_at: string
+  // Only present for question_type === 'match' (drag-and-drop matching).
+  match_items?: string[] | null      // draggable statements
+  match_buckets?: string[] | null    // category targets
+  match_correct?: number[] | null    // parallel to match_items: index into match_buckets, or -1 = leave unassigned
 }
 
 export type QuestionBank = {
@@ -72,6 +76,7 @@ export type ExamAnswer = {
   skipped: boolean
   timeSpent: number
   confidence?: Confidence
+  matchAssignment?: number[]   // 'match' questions only: parallel to match_items, bucket index per item (-1 = unassigned)
 }
 
 export type AttemptResult = {
@@ -88,4 +93,9 @@ export type AttemptResult = {
   flagged: boolean
   skipped: boolean
   confidence?: Confidence
+  // 'match' questions only
+  match_items?: string[] | null
+  match_buckets?: string[] | null
+  match_correct?: number[] | null
+  match_assignment?: number[] | null
 }

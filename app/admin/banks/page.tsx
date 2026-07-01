@@ -71,7 +71,7 @@ export default function BanksPage() {
     setBusyBank(bank.id); setRestoreMsg('')
     const { data, error: err } = await supabase
       .from('questions')
-      .select('question_text, question_type, options, correct_indices, explanation, topic, image_url, order_index')
+      .select('question_text, question_type, options, correct_indices, explanation, topic, image_url, order_index, match_items, match_buckets, match_correct')
       .eq('bank_id', bank.id)
       .order('order_index', { ascending: true })
     setBusyBank(null)
@@ -127,6 +127,9 @@ export default function BanksPage() {
         explanation: q.explanation ?? '',
         topic: q.topic ?? 'General',
         image_url: q.image_url ?? null,
+        match_items: q.match_items ?? null,
+        match_buckets: q.match_buckets ?? null,
+        match_correct: q.match_correct ?? null,
         order_index: q.order_index ?? i + 1,
       }))
       // Insert in chunks so large banks don't hit request-size limits.

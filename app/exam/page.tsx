@@ -229,6 +229,112 @@ function ExamSetup({ questions, mode, onStart }: {
   return null
 }
 
+// Drag-and-drop matching question (e.g. "match each statement to its
+// category"). Works with mouse and touch via Pointer Events — a chip captures
+// the pointer on press so drag/release keep firing on it even off-element,
+// and we hit-test the drop target with elementFromPoint.
+function MatchQuestion({ q, assignment, onChange, confirmed }: {
+  q: Question; assignment: number[]; onChange: (a: number[]) => void; confirmed: boolean
+}) {
+  const items = q.match_items ?? []
+  const buckets = q.match_buckets ?? []
+  const correct = q.match_correct ?? []
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const [pos, setPos] = useState({ x: 0, y: 0 })
+  const [hoverBucket, setHoverBucket] = useState<number | null>(null)
+
+  function assign(itemIdx: number, bucketIdx: number) {
+    const next = [...assignment]
+    next[itemIdx] = bucketIdx
+    onChange(next)
+  }
+
+  function onPointerDown(e: React.PointerEvent, itemIdx: number) {
+    if (confirmed) return
+    ;(e.target as Element).setPointerCapture(e.pointerId)
+    setDragIdx(itemIdx)
+    setPos({ x: e.clientX, y: e.clientY })
+  }
+  function onPointerMove(e: React.PointerEvent) {
+    if (dragIdx === null) return
+    setPos({ x: e.clientX, y: e.clientY })
+    const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-bucket-idx]') as HTMLElement | null
+    setHoverBucket(el ? parseInt(el.dataset.bucketIdx!, 10) : null)
+  }
+  function onPointerUp() {
+    if (dragIdx === null) return
+    assign(dragIdx, hoverBucket ?? -1)
+    setDragIdx(null)
+    setHoverBucket(null)
+  }
+
+  const chipStyle = (itemIdx: number) => {
+    if (!confirmed) return 'bg-white border-gray-200 text-gray-800'
+    const ok = (assignment[itemIdx] ?? -1) === (correct[itemIdx] ?? -1)
+    return ok ? 'bg-green-50 border-green-400 text-green-800' : 'bg-red-50 border-red-400 text-red-700'
+  }
+
+  const pool = items.map((_, i) => i).filter(i => (assignment[i] ?? -1) === -1)
+
+  return (
+    <div className="select-none">
+      {/* Unassigned items pool */}
+      <p className="text-xs font-medium text-gray-400 mb-1.5">Drag each item to where it belongs</p>
+      <div data-pool className="flex flex-wrap gap-2 min-h-[3rem] bg-gray-50 rounded-2xl p-2.5 mb-3">
+        {pool.length === 0 && <span className="text-xs text-gray-300 py-1.5">All items placed</span>}
+        {pool.map(i => (
+          <div key={i}
+            onPointerDown={e => onPointerDown(e, i)}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            style={{ touchAction: 'none' }}
+            className={`px-3 py-2 rounded-xl border-2 text-sm cursor-grab active:cursor-grabbing whitespace-pre-wrap break-words ${chipStyle(i)} ${dragIdx === i ? 'opacity-30' : ''}`}>
+            {items[i]}
+          </div>
+        ))}
+      </div>
+
+      {/* Buckets */}
+      <div className="space-y-2">
+        {buckets.map((b, bi) => (
+          <div key={bi} data-bucket-idx={bi}
+            className={`rounded-2xl border-2 p-2.5 transition-colors ${hoverBucket === bi ? 'border-brand-400 bg-brand-50' : 'border-gray-200 bg-white'}`}>
+            <p className="text-xs font-bold text-gray-600 mb-1.5">{b}</p>
+            <div className="flex flex-wrap gap-2 min-h-[2.25rem]">
+              {items.map((_, i) => (assignment[i] ?? -1) === bi ? (
+                <div key={i}
+                  onPointerDown={e => onPointerDown(e, i)}
+                  onPointerMove={onPointerMove}
+                  onPointerUp={onPointerUp}
+                  onClick={() => !confirmed && assign(i, -1)}
+                  style={{ touchAction: 'none' }}
+                  title={confirmed ? undefined : 'Drag out, or tap to remove'}
+                  className={`px-3 py-2 rounded-xl border-2 text-sm cursor-grab active:cursor-grabbing whitespace-pre-wrap break-words ${chipStyle(i)} ${dragIdx === i ? 'opacity-30' : ''}`}>
+                  {items[i]}
+                </div>
+              ) : null)}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Floating drag ghost */}
+      {dragIdx !== null && (
+        <div className="fixed z-[80] pointer-events-none px-3 py-2 rounded-xl border-2 border-brand-500 bg-white shadow-lg text-sm max-w-[80vw]"
+          style={{ left: pos.x, top: pos.y, transform: 'translate(-50%, -50%)' }}>
+          {items[dragIdx]}
+        </div>
+      )}
+
+      {confirmed && (
+        <p className="text-xs text-gray-400 mt-2 text-center">
+          🟢 correct placement · 🔴 incorrect — review the buckets above
+        </p>
+      )}
+    </div>
+  )
+}
+
 function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState, keywordInit, focus, srs }: {
   questions: Question[]; mode: ExamMode; bankId: string; bankName: string; timeLimit: number | null
   resumeState?: SessionState | null; keywordInit: boolean; focus?: boolean; srs?: boolean
@@ -355,6 +461,10 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
 
   const lowTime = secondsLeft !== null && secondsLeft <= 300
 
+  function hasResponse(a: ExamAnswer) {
+    return a.selectedIndices.length > 0 || !!(a.matchAssignment && a.matchAssignment.some(x => x !== -1))
+  }
+
   function toggleSelect(i: number) {
     if (confirmed && !isLearning) return
     if (isLearning && confirmed) return
@@ -408,12 +518,12 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
       // Auto-confirm skipped
       setAnswers(prev => {
         const updated = [...prev]
-        if (updated[current].selectedIndices.length === 0) updated[current] = { ...updated[current], skipped: true }
+        if (!hasResponse(updated[current])) updated[current] = { ...updated[current], skipped: true }
         return updated
       })
     }
     setCurrent(index)
-    setConfirmed(isLearning ? answers[index].selectedIndices.length > 0 || answers[index].skipped : false)
+    setConfirmed(isLearning ? hasResponse(answers[index]) || answers[index].skipped : false)
     setShowNav(false)
     questionStartRef.current = Date.now()
   }
@@ -421,14 +531,14 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
   function next() {
     setAnswers(prev => {
       const updated = [...prev]
-      if (updated[current].selectedIndices.length === 0) updated[current] = { ...updated[current], skipped: true }
+      if (!hasResponse(updated[current])) updated[current] = { ...updated[current], skipped: true }
       return updated
     })
     if (current < questions.length - 1) {
       const target = current + 1
       setCurrent(target)
       // In learning mode, a question already answered/skipped should show its result again
-      setConfirmed(isLearning ? (answers[target].selectedIndices.length > 0 || answers[target].skipped) : false)
+      setConfirmed(isLearning ? (hasResponse(answers[target]) || answers[target].skipped) : false)
       questionStartRef.current = Date.now()
     } else {
       submitExam()
@@ -440,7 +550,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
     if (current === 0) return
     const target = current - 1
     setCurrent(target)
-    setConfirmed(isLearning ? (answers[target].selectedIndices.length > 0 || answers[target].skipped) : false)
+    setConfirmed(isLearning ? (hasResponse(answers[target]) || answers[target].skipped) : false)
     questionStartRef.current = Date.now()
   }
 
@@ -451,15 +561,25 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
     if (timerRef.current) clearInterval(timerRef.current)
     const results = questions.map((q, i) => {
       const a = answers[i]
-      const sel = a.selectedIndices.sort()
-      const cor = q.correct_indices.sort()
-      const correct = sel.length === cor.length && sel.every((v, j) => v === cor[j])
+      let correct: boolean
+      if (q.question_type === 'match') {
+        const items = q.match_items ?? []
+        const key = q.match_correct ?? []
+        const given = a.matchAssignment ?? []
+        correct = items.length > 0 && items.every((_, idx) => (given[idx] ?? -1) === (key[idx] ?? -1))
+      } else {
+        const sel = a.selectedIndices.sort()
+        const cor = q.correct_indices.sort()
+        correct = sel.length === cor.length && sel.every((v, j) => v === cor[j])
+      }
       return {
         questionId: q.id, question_text: q.question_text,
         question_type: q.question_type, options: q.options,
         correct_indices: q.correct_indices, selected_indices: a.selectedIndices,
         explanation: q.explanation, topic: q.topic, image_url: q.image_url,
         correct, flagged: a.flagged, skipped: a.skipped, confidence: a.confidence,
+        match_items: q.match_items, match_buckets: q.match_buckets,
+        match_correct: q.match_correct, match_assignment: a.matchAssignment,
       }
     })
     // Spaced-repetition: reschedule each reviewed question (Review Queue only).
@@ -510,7 +630,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
   const progress = ((current + 1) / questions.length) * 100
-  const answeredCount = answers.filter(a => a.selectedIndices.length > 0).length
+  const answeredCount = answers.filter(a => hasResponse(a)).length
   const flaggedCount = answers.filter(a => a.flagged).length
 
   function optionStyle(i: number) {
@@ -610,9 +730,10 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
             <span className={`tag text-xs ${
               q.question_type === 'multiple' ? 'bg-purple-100 text-purple-700' :
               q.question_type === 'truefalse' ? 'bg-blue-100 text-blue-700' :
+              q.question_type === 'match' ? 'bg-teal-100 text-teal-700' :
               'bg-gray-100 text-gray-500'
             }`}>
-              {q.question_type === 'multiple' ? 'Multiple answer' : q.question_type === 'truefalse' ? 'True / False' : 'Single answer'}
+              {q.question_type === 'multiple' ? 'Multiple answer' : q.question_type === 'truefalse' ? 'True / False' : q.question_type === 'match' ? 'Match' : 'Single answer'}
             </span>
             <div className="ml-auto flex items-center gap-3">
               <button onClick={() => setKeywordOn(v => !v)} className={`text-lg active:scale-95 ${keywordOn ? '' : 'opacity-30 grayscale'}`} title="Toggle highlights (keywords + your own)">
@@ -642,24 +763,37 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
         </div>
 
         <div className="space-y-3 flex-1">
-          {q.options.map((opt, i) => (
-            <button key={i} onClick={() => toggleSelect(i)}
-              className={`w-full text-left px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-[0.98] flex items-start gap-3 ${optionStyle(i)}`}>
-              <span className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold mt-0.5 border-2 ${circleSyle(i)}`}>
-                {OPTION_LABELS[i] || i}
-              </span>
-              <span className="text-sm leading-relaxed whitespace-pre-wrap break-words select-text">
-                <KeywordText
-                  text={opt}
-                  enabled={keywordOn}
-                  personal={keywordOn ? (highlights.get(q.id) ?? []) : []}
-                  onAddHighlight={keywordOn ? addHighlight : undefined}
-                  onRemoveHighlight={keywordOn ? removeHighlight : undefined}
-                />
-              </span>
-              {confirmed && q.correct_indices.includes(i) && <span className="ml-auto text-green-600 flex-shrink-0">✓</span>}
-            </button>
-          ))}
+          {q.question_type === 'match' ? (
+            <MatchQuestion
+              q={q}
+              assignment={answer.matchAssignment ?? new Array((q.match_items ?? []).length).fill(-1)}
+              confirmed={confirmed}
+              onChange={next => setAnswers(prev => {
+                const updated = [...prev]
+                updated[current] = { ...updated[current], matchAssignment: next }
+                return updated
+              })}
+            />
+          ) : (
+            q.options.map((opt, i) => (
+              <button key={i} onClick={() => toggleSelect(i)}
+                className={`w-full text-left px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-[0.98] flex items-start gap-3 ${optionStyle(i)}`}>
+                <span className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold mt-0.5 border-2 ${circleSyle(i)}`}>
+                  {OPTION_LABELS[i] || i}
+                </span>
+                <span className="text-sm leading-relaxed whitespace-pre-wrap break-words select-text">
+                  <KeywordText
+                    text={opt}
+                    enabled={keywordOn}
+                    personal={keywordOn ? (highlights.get(q.id) ?? []) : []}
+                    onAddHighlight={keywordOn ? addHighlight : undefined}
+                    onRemoveHighlight={keywordOn ? removeHighlight : undefined}
+                  />
+                </span>
+                {confirmed && q.correct_indices.includes(i) && <span className="ml-auto text-green-600 flex-shrink-0">✓</span>}
+              </button>
+            ))
+          )}
         </div>
 
         {/* Explanation (learning mode) */}
@@ -671,7 +805,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
         )}
 
         {/* Discuss with AI (learning mode, once answer is revealed) */}
-        {isLearning && confirmed && (
+        {isLearning && confirmed && q.question_type !== 'match' && (
           <button
             onClick={() => setTutor({
               question_id: q.id,
@@ -688,7 +822,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
         )}
 
         {/* Confidence check — optional, tap to select before confirming */}
-        {!confirmed && answer.selectedIndices.length > 0 && (
+        {!confirmed && hasResponse(answer) && (
           <div className="mt-4">
             <p className="text-xs font-medium text-gray-400 mb-1.5 text-center">How confident are you?</p>
             <div className="flex gap-2">
@@ -711,7 +845,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
         {/* Action buttons */}
         <div className="mt-5 pb-4 space-y-2">
           {!confirmed ? (
-            <button onClick={confirmAnswer} disabled={answer.selectedIndices.length === 0} className="btn-primary">
+            <button onClick={confirmAnswer} disabled={!hasResponse(answer)} className="btn-primary">
               Confirm answer
             </button>
           ) : (
@@ -754,7 +888,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
               {questions.map((_, i) => {
                 const a = answers[i]
                 const isCurrent = i === current
-                const isAnswered = a.selectedIndices.length > 0
+                const isAnswered = hasResponse(a)
                 return (
                   <button key={i} onClick={() => goTo(i)}
                     className={`relative h-10 rounded-xl text-sm font-bold transition-all active:scale-95 ${

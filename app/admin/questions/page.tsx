@@ -100,6 +100,11 @@ export default function QuestionsPage() {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
 
+  // Match (drag-and-drop) question fields — only used when qType === 'match'
+  const [matchBuckets, setMatchBuckets] = useState<string[]>(['', ''])
+  const [matchItems, setMatchItems] = useState<string[]>(['', ''])
+  const [matchCorrect, setMatchCorrect] = useState<number[]>([-1, -1])   // parallel to matchItems; -1 = unassigned/distractor
+
   const router = useRouter()
   const supabase = createClient()
 
@@ -187,6 +192,7 @@ export default function QuestionsPage() {
     setQuestionText(''); setOptions(['', '', '', '']); setCorrectIndices([])
     setExplanation(''); setTopic(''); setQType('single'); setError('')
     setImageUrl(null); setEditingQuestion(null); setExtractNote('')
+    setMatchBuckets(['', '']); setMatchItems(['', '']); setMatchCorrect([-1, -1])
   }
 
   function openEditForm(q: Question) {
@@ -198,8 +204,32 @@ export default function QuestionsPage() {
     setExplanation(q.explanation ?? '')
     setTopic(q.topic ?? '')
     setImageUrl(q.image_url ?? null)
+    if (q.question_type === 'match') {
+      setMatchBuckets(q.match_buckets && q.match_buckets.length ? [...q.match_buckets] : ['', ''])
+      setMatchItems(q.match_items && q.match_items.length ? [...q.match_items] : ['', ''])
+      setMatchCorrect(q.match_correct && q.match_correct.length ? [...q.match_correct] : [-1, -1])
+    } else {
+      setMatchBuckets(['', '']); setMatchItems(['', '']); setMatchCorrect([-1, -1])
+    }
     setError('')
     setShowForm(true)
+  }
+
+  // Match-type helpers
+  function addMatchBucket() { setMatchBuckets(prev => [...prev, '']) }
+  function removeMatchBucket(i: number) {
+    if (matchBuckets.length <= 2) return
+    setMatchBuckets(prev => prev.filter((_, idx) => idx !== i))
+    setMatchCorrect(prev => prev.map(c => c === i ? -1 : c > i ? c - 1 : c))
+  }
+  function addMatchItem() { setMatchItems(prev => [...prev, '']); setMatchCorrect(prev => [...prev, -1]) }
+  function removeMatchItem(i: number) {
+    if (matchItems.length <= 2) return
+    setMatchItems(prev => prev.filter((_, idx) => idx !== i))
+    setMatchCorrect(prev => prev.filter((_, idx) => idx !== i))
+  }
+  function setMatchItemBucket(i: number, bucketIdx: number) {
+    setMatchCorrect(prev => { const next = [...prev]; next[i] = next[i] === bucketIdx ? -1 : bucketIdx; return next })
   }
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -226,12 +256,21 @@ export default function QuestionsPage() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
-    const activeOptions = buildActiveOptions()
-    if (qType !== 'truefalse') {
-      if (activeOptions.length < 2) { setError('Add at least 2 answer options.'); return }
-      if (activeOptions.some(o => !o)) { setError('Fill in every answer option, or remove the empty ones.'); return }
+    if (qType === 'match') {
+      const cleanBuckets = matchBuckets.map(b => b.trim()).filter(Boolean)
+      const cleanItems = matchItems.map(i => i.trim())
+      if (cleanBuckets.length < 2) { setError('Add at least 2 buckets.'); return }
+      if (cleanItems.length < 2) { setError('Add at least 2 items to match.'); return }
+      if (cleanItems.some(i => !i)) { setError('Fill in every item, or remove the empty ones.'); return }
+      if (!matchCorrect.some(c => c !== -1)) { setError('Assign at least one item to a bucket.'); return }
+    } else {
+      const activeOptions = buildActiveOptions()
+      if (qType !== 'truefalse') {
+        if (activeOptions.length < 2) { setError('Add at least 2 answer options.'); return }
+        if (activeOptions.some(o => !o)) { setError('Fill in every answer option, or remove the empty ones.'); return }
+      }
+      if (correctIndices.length === 0) { setError('Select at least one correct answer.'); return }
     }
-    if (correctIndices.length === 0) { setError('Select at least one correct answer.'); return }
     setError('')
 
     // Duplicate guard — warn if an identical question already exists in this bank
@@ -249,17 +288,33 @@ export default function QuestionsPage() {
     await doSave()
   }
 
+  // Shared fields that depend on the question type — match questions store
+  // their data in match_* columns and leave options/correct_indices empty;
+  // everything else is the reverse, so switching types cleanly clears the other.
+  function typeSpecificFields() {
+    if (qType === 'match') {
+      return {
+        options: [], correct_indices: [],
+        match_items: matchItems.map(i => i.trim()),
+        match_buckets: matchBuckets.map(b => b.trim()).filter(Boolean),
+        match_correct: matchCorrect,
+      }
+    }
+    return {
+      options: buildActiveOptions(), correct_indices: correctIndices,
+      match_items: null, match_buckets: null, match_correct: null,
+    }
+  }
+
   // Performs the actual insert/update (called after the duplicate check, or on "Save anyway")
   async function doSave() {
     setSaving(true); setError(''); setDuplicateOf(null)
-    const activeOptions = buildActiveOptions()
 
     if (editingQuestion) {
       const { error: err } = await supabase.from('questions').update({
         question_text: questionText.trim(),
         question_type: qType,
-        options: activeOptions,
-        correct_indices: correctIndices,
+        ...typeSpecificFields(),
         explanation,
         topic: topic || 'General',
         image_url: imageUrl,
@@ -276,8 +331,7 @@ export default function QuestionsPage() {
         bank_id: selectedBank,
         question_text: questionText.trim(),
         question_type: qType,
-        options: activeOptions,
-        correct_indices: correctIndices,
+        ...typeSpecificFields(),
         explanation,
         topic: topic || 'General',
         image_url: imageUrl,
@@ -754,7 +808,7 @@ export default function QuestionsPage() {
                 <div>
                   <label className="text-sm font-medium text-gray-600 block mb-2">Question type</label>
                   <div className="flex gap-2">
-                    {([['single','Single'], ['multiple','Multiple'], ['truefalse','True/False']] as [QuestionType, string][]).map(([val, label]) => (
+                    {([['single','Single'], ['multiple','Multiple'], ['truefalse','True/False'], ['match','Match']] as [QuestionType, string][]).map(([val, label]) => (
                       <button key={val} type="button" onClick={() => { setQType(val); setCorrectIndices([]) }}
                         className={`flex-1 py-2 text-xs font-medium rounded-lg border transition-all ${qType === val ? 'bg-brand-600 text-white border-brand-600' : 'border-gray-200 text-gray-600'}`}>
                         {label}
@@ -792,45 +846,99 @@ export default function QuestionsPage() {
                   )}
                 </div>
 
-                {/* Options */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-600 block">
-                    {qType === 'truefalse' ? 'Correct answer' : 'Answer options'}
-                  </label>
-                  {(qType === 'truefalse' ? tfOptions : options).map((opt, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <button type="button" onClick={() => toggleCorrect(i)}
-                        className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold border-2 transition-all ${
-                          correctIndices.includes(i)
-                            ? 'bg-green-500 border-green-500 text-white'
-                            : 'border-gray-300 text-gray-400'
-                        }`}>
-                        {qType === 'truefalse' ? (i === 0 ? 'T' : 'F') : OPTION_LABELS[i]}
+                {/* Options (single / multiple / true-false) */}
+                {qType !== 'match' && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-600 block">
+                      {qType === 'truefalse' ? 'Correct answer' : 'Answer options'}
+                    </label>
+                    {(qType === 'truefalse' ? tfOptions : options).map((opt, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <button type="button" onClick={() => toggleCorrect(i)}
+                          className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold border-2 transition-all ${
+                            correctIndices.includes(i)
+                              ? 'bg-green-500 border-green-500 text-white'
+                              : 'border-gray-300 text-gray-400'
+                          }`}>
+                          {qType === 'truefalse' ? (i === 0 ? 'T' : 'F') : OPTION_LABELS[i]}
+                        </button>
+                        {qType === 'truefalse' ? (
+                          <span className="text-sm text-gray-700 font-medium">{opt}</span>
+                        ) : (
+                          <>
+                            <input className="input-field" placeholder={`Option ${OPTION_LABELS[i]}`}
+                              value={opt} onChange={e => { const o = [...options]; o[i] = e.target.value; setOptions(o) }} />
+                            {options.length > 2 && (
+                              <button type="button" onClick={() => removeOption(i)}
+                                className="text-gray-300 text-lg px-1 active:scale-95 flex-shrink-0" title="Remove option">
+                                ✕
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    ))}
+                    {qType !== 'truefalse' && options.length < MAX_OPTIONS && (
+                      <button type="button" onClick={addOption}
+                        className="text-sm font-medium text-brand-600 active:scale-95">
+                        + Add option
                       </button>
-                      {qType === 'truefalse' ? (
-                        <span className="text-sm text-gray-700 font-medium">{opt}</span>
-                      ) : (
-                        <>
-                          <input className="input-field" placeholder={`Option ${OPTION_LABELS[i]}`}
-                            value={opt} onChange={e => { const o = [...options]; o[i] = e.target.value; setOptions(o) }} />
-                          {options.length > 2 && (
-                            <button type="button" onClick={() => removeOption(i)}
-                              className="text-gray-300 text-lg px-1 active:scale-95 flex-shrink-0" title="Remove option">
-                              ✕
-                            </button>
+                    )}
+                    <p className="text-xs text-gray-400">Tap the letter/circle to mark the correct answer(s)</p>
+                  </div>
+                )}
+
+                {/* Match (drag-and-drop) builder */}
+                {qType === 'match' && (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-600 block">Buckets (categories)</label>
+                      {matchBuckets.map((b, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <input className="input-field" placeholder={`Bucket ${i + 1}`}
+                            value={b} onChange={e => { const arr = [...matchBuckets]; arr[i] = e.target.value; setMatchBuckets(arr) }} />
+                          {matchBuckets.length > 2 && (
+                            <button type="button" onClick={() => removeMatchBucket(i)}
+                              className="text-gray-300 text-lg px-1 active:scale-95 flex-shrink-0" title="Remove bucket">✕</button>
                           )}
-                        </>
-                      )}
+                        </div>
+                      ))}
+                      <button type="button" onClick={addMatchBucket} className="text-sm font-medium text-brand-600 active:scale-95">
+                        + Add bucket
+                      </button>
                     </div>
-                  ))}
-                  {qType !== 'truefalse' && options.length < MAX_OPTIONS && (
-                    <button type="button" onClick={addOption}
-                      className="text-sm font-medium text-brand-600 active:scale-95">
-                      + Add option
-                    </button>
-                  )}
-                  <p className="text-xs text-gray-400">Tap the letter/circle to mark the correct answer(s)</p>
-                </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-600 block">Items to match</label>
+                      <p className="text-xs text-gray-400">For each item, tap the bucket it belongs to. Leave unselected for a distractor (an item that shouldn&apos;t be placed anywhere).</p>
+                      {matchItems.map((item, i) => (
+                        <div key={i} className="border border-gray-100 rounded-xl p-2.5 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <input className="input-field" placeholder={`Item ${i + 1}`}
+                              value={item} onChange={e => { const arr = [...matchItems]; arr[i] = e.target.value; setMatchItems(arr) }} />
+                            {matchItems.length > 2 && (
+                              <button type="button" onClick={() => removeMatchItem(i)}
+                                className="text-gray-300 text-lg px-1 active:scale-95 flex-shrink-0" title="Remove item">✕</button>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {matchBuckets.map((b, bi) => (
+                              <button key={bi} type="button" onClick={() => setMatchItemBucket(i, bi)}
+                                className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${
+                                  matchCorrect[i] === bi ? 'bg-teal-600 text-white border-teal-600' : 'border-gray-200 text-gray-500'
+                                }`}>
+                                {b.trim() || `Bucket ${bi + 1}`}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      <button type="button" onClick={addMatchItem} className="text-sm font-medium text-brand-600 active:scale-95">
+                        + Add item
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Topic */}
                 <div>
@@ -899,9 +1007,10 @@ export default function QuestionsPage() {
                           <span className={`tag text-xs ${
                             q.question_type === 'multiple' ? 'bg-purple-100 text-purple-700' :
                             q.question_type === 'truefalse' ? 'bg-blue-100 text-blue-700' :
+                            q.question_type === 'match' ? 'bg-teal-100 text-teal-700' :
                             'bg-gray-100 text-gray-600'
                           }`}>
-                            {q.question_type === 'multiple' ? 'Multi' : q.question_type === 'truefalse' ? 'T/F' : 'Single'}
+                            {q.question_type === 'multiple' ? 'Multi' : q.question_type === 'truefalse' ? 'T/F' : q.question_type === 'match' ? 'Match' : 'Single'}
                           </span>
                           {q.topic && <span className="tag bg-green-50 text-green-700">{q.topic}</span>}
                           {q.image_url && <span className="tag bg-amber-50 text-amber-700">🖼️</span>}
