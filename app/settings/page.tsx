@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import BottomNav from '@/components/BottomNav'
 import { useSettings, tapFeedback, type Theme, type FontSize } from '@/lib/settings'
 import type { ExamMode } from '@/lib/types'
@@ -128,6 +129,18 @@ export default function SettingsPage() {
               <Toggle on={settings.feedback} onChange={v => { update({ feedback: v }); if (v) tapFeedback(true) }} />
             </label>
           </div>
+        </section>
+
+        {/* About */}
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-gray-600">About</h2>
+          <Link href="/about" className="card flex items-center justify-between active:scale-[0.98] transition-transform">
+            <div>
+              <p className="text-sm font-medium text-gray-800">About &amp; What&apos;s New</p>
+              <p className="text-xs text-gray-400">Changelog and app info</p>
+            </div>
+            <span className="text-brand-600 text-lg">→</span>
+          </Link>
         </section>
 
         <p className="text-center text-xs text-gray-400 pt-2">Settings are saved on this device.</p>
