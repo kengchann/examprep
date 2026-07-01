@@ -75,6 +75,30 @@ export async function computeWeakTopics(): Promise<TopicStat[]> {
   return (await gatherHistory()).topics
 }
 
+export type Readiness = {
+  score: number         // 0-100, headline number
+  accuracy: number       // 0-1, avg recency-weighted accuracy across topics
+  coverage: number       // 0-1, fraction of the bank attempted at least once
+  questionsSeen: number
+  totalQuestions: number
+}
+
+// A single "how exam-ready am I?" number, blending accuracy (how well you do
+// on what you've tried) with coverage (how much of the bank you've actually
+// tried). Weighted toward accuracy — coverage alone means little without it.
+export async function computeReadiness(): Promise<Readiness> {
+  const { topics, seenIds } = await gatherHistory()
+  const accuracy = topics.length ? topics.reduce((s, t) => s + t.accuracy, 0) / topics.length : 0
+
+  const supabase = createClient()
+  const { count } = await supabase.from('questions').select('id', { count: 'exact', head: true })
+  const totalQuestions = count ?? 0
+  const coverage = totalQuestions > 0 ? Math.min(1, seenIds.size / totalQuestions) : 0
+
+  const score = Math.round((accuracy * 0.7 + coverage * 0.3) * 100)
+  return { score, accuracy, coverage, questionsSeen: seenIds.size, totalQuestions }
+}
+
 // Order a topic's questions: ones you got wrong first, then unseen, then the
 // rest — with a shuffle inside each tier for variety.
 function prioritize(qs: Question[], wrongIds: Set<string>, seenIds: Set<string>): Question[] {

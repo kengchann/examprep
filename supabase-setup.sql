@@ -391,6 +391,24 @@ DROP POLICY IF EXISTS "Users manage own mistake bank" ON mistake_bank;
 CREATE POLICY "Users manage own mistake bank" ON mistake_bank
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
+-- ============================================
+-- v3.0 — Cloud-synced spaced repetition (Review Queue). Replaces the earlier
+-- device-only localStorage schedule so progress follows the student across
+-- devices, like everything else in the app.
+-- ============================================
+CREATE TABLE IF NOT EXISTS srs_schedule (
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  question_id UUID REFERENCES questions(id) ON DELETE CASCADE,
+  box INTEGER NOT NULL DEFAULT 0,
+  due_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (user_id, question_id)
+);
+ALTER TABLE srs_schedule ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users manage own srs schedule" ON srs_schedule;
+CREATE POLICY "Users manage own srs schedule" ON srs_schedule
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
 -- 👑 MAKE YOURSELF SUPERADMIN — run this once with your login email:
 -- UPDATE public.profiles SET role = 'superadmin' WHERE email = 'kengchann@gmail.com';
 

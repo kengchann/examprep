@@ -69,6 +69,7 @@ function ResultsContent() {
   const wrong = results.filter(r => !r.correct && !r.skipped && r.selected_indices.length > 0).length
   const skipped = results.filter(r => r.skipped || r.selected_indices.length === 0).length
   const flagged = results.filter(r => r.flagged)
+  const overconfident = results.filter(r => !r.correct && r.confidence === 'sure')
   const score = total > 0 ? Math.round((correct / total) * 100) : 0
   const passed = score >= 70
   const formatTime = (s: number) => `${Math.floor(s / 60)}m ${s % 60}s`
@@ -172,6 +173,17 @@ function ResultsContent() {
                 ))}
               </div>
             </div>
+            {overconfident.length > 0 && (
+              <div className="card border-orange-200 bg-orange-50">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">⚠️</span>
+                  <div>
+                    <p className="font-semibold text-orange-900 text-sm">{overconfident.length} overconfident miss{overconfident.length !== 1 ? 'es' : ''}</p>
+                    <p className="text-xs text-orange-700">You were sure — but wrong. Worth a closer look in Review.</p>
+                  </div>
+                </div>
+              </div>
+            )}
             {flagged.length > 0 && (
               <div className="card">
                 <div className="flex items-center justify-between mb-2">
@@ -248,11 +260,14 @@ function ResultsContent() {
                       {r.correct ? '✓' : r.skipped || r.selected_indices.length === 0 ? '–' : '✗'}
                     </span>
                     <div className="flex-1">
-                      <div className="flex items-center gap-1 mb-1">
+                      <div className="flex items-center gap-1 mb-1 flex-wrap">
                         {r.flagged && <span className="text-xs">🚩</span>}
                         <span className={`tag text-xs ${r.question_type === 'multiple' ? 'bg-purple-100 text-purple-700' : r.question_type === 'truefalse' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
                           {r.question_type === 'multiple' ? 'Multi' : r.question_type === 'truefalse' ? 'T/F' : 'Single'}
                         </span>
+                        {!r.correct && r.confidence === 'sure' && (
+                          <span className="tag text-xs bg-orange-100 text-orange-700">⚠️ Overconfident</span>
+                        )}
                         <button onClick={() => toggleStar(r.questionId)} className="ml-auto text-base active:scale-95" title="Bookmark this question">
                           {bookmarks.has(r.questionId) ? '⭐' : '☆'}
                         </button>

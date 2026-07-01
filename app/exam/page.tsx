@@ -14,7 +14,7 @@ import { addMistake } from '@/lib/mistakes'
 import { fetchHighlightMap, saveHighlights } from '@/lib/highlights'
 import KeywordText from '@/components/KeywordText'
 import InsightCard, { type TutorContext } from '@/components/InsightCard'
-import type { Question, ExamMode, ExamAnswer } from '@/lib/types'
+import type { Question, ExamMode, ExamAnswer, Confidence } from '@/lib/types'
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
@@ -387,6 +387,14 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
     setConfirmed(true)
   }
 
+  function setConfidence(c: Confidence) {
+    setAnswers(prev => {
+      const updated = [...prev]
+      updated[current] = { ...updated[current], confidence: updated[current].confidence === c ? undefined : c }
+      return updated
+    })
+  }
+
   function toggleFlag() {
     setAnswers(prev => {
       const updated = [...prev]
@@ -451,11 +459,11 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
         question_type: q.question_type, options: q.options,
         correct_indices: q.correct_indices, selected_indices: a.selectedIndices,
         explanation: q.explanation, topic: q.topic, image_url: q.image_url,
-        correct, flagged: a.flagged, skipped: a.skipped,
+        correct, flagged: a.flagged, skipped: a.skipped, confidence: a.confidence,
       }
     })
     // Spaced-repetition: reschedule each reviewed question (Review Queue only).
-    if (srs) applySrs(results.map(r => ({ questionId: r.questionId, correct: r.correct })))
+    if (srs) applySrs(results.map(r => ({ questionId: r.questionId, correct: r.correct }))).catch(() => {})
     // My Mistakes deck: auto-collect anything missed, from any mode. Stays until
     // the student manually marks it mastered (best-effort, never blocks submit).
     for (const r of results) {
@@ -677,6 +685,27 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
             className="mt-3 text-sm font-medium text-brand-600 border border-brand-200 rounded-xl px-3 py-2 active:scale-95">
             💡 See why
           </button>
+        )}
+
+        {/* Confidence check — optional, tap to select before confirming */}
+        {!confirmed && answer.selectedIndices.length > 0 && (
+          <div className="mt-4">
+            <p className="text-xs font-medium text-gray-400 mb-1.5 text-center">How confident are you?</p>
+            <div className="flex gap-2">
+              {([
+                ['sure', '✅ Sure'],
+                ['unsure', '🤔 Not sure'],
+                ['guess', '😅 Guessed'],
+              ] as [Confidence, string][]).map(([c, label]) => (
+                <button key={c} onClick={() => setConfidence(c)}
+                  className={`flex-1 text-xs font-medium py-2 rounded-xl border transition-all active:scale-95 ${
+                    answer.confidence === c ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-gray-600 border-gray-200'
+                  }`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* Action buttons */}

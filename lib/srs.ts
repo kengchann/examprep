@@ -1,44 +1,49 @@
-// Lightweight spaced repetition (Leitner-style), stored on-device in
-// localStorage — no backend, no migration. Each question advances through boxes
-// with growing intervals when answered correctly, and resets when missed.
-//
-// (Per-device for now; can be upgraded to a cloud table later for cross-device.)
+import { createClient } from './supabase'
 
-const KEY = 'examprep_srs'
+// Cloud-synced spaced repetition (Leitner-style). Each question advances
+// through boxes with growing intervals when answered correctly, and resets to
+// box 1 when missed. Stored in Supabase so progress follows the student across
+// devices, same as everything else in the app.
+
 const DAY = 86_400_000
 // Days until next review, indexed by box. Box 0 = brand new / just lapsed.
 const INTERVALS = [0, 1, 3, 7, 16, 45]
 
 export type SRState = { box: number; due: number }   // due = epoch ms
 
-function load(): Record<string, SRState> {
-  if (typeof window === 'undefined') return {}
-  try { return JSON.parse(localStorage.getItem(KEY) || '{}') } catch { return {} }
-}
-function save(m: Record<string, SRState>) {
-  try { localStorage.setItem(KEY, JSON.stringify(m)) } catch {}
+// All scheduled questions for the current user.
+export async function fetchSrs(): Promise<Record<string, SRState>> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return {}
+  const { data } = await supabase.from('srs_schedule').select('question_id, box, due_at').eq('user_id', user.id)
+  const m: Record<string, SRState> = {}
+  for (const row of (data ?? []) as { question_id: string; box: number; due_at: string }[]) {
+    m[row.question_id] = { box: row.box, due: new Date(row.due_at).getTime() }
+  }
+  return m
 }
 
-export function getSrs(): Record<string, SRState> {
-  return load()
-}
-
-// Update one question's schedule after a review.
 function step(cur: SRState | undefined, correct: boolean): SRState {
   const box = correct ? Math.min((cur?.box ?? 0) + 1, INTERVALS.length - 1) : 1
   return { box, due: Date.now() + INTERVALS[box] * DAY }
 }
 
-// Apply a batch of results (called after a Review Queue session finishes).
-export function applyResults(results: { questionId: string; correct: boolean }[]) {
-  const m = load()
-  for (const r of results) m[r.questionId] = step(m[r.questionId], r.correct)
-  save(m)
-}
+// Apply a batch of results (called after a Review Queue / SRS session finishes).
+export async function applyResults(results: { questionId: string; correct: boolean }[]): Promise<void> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || results.length === 0) return
 
-// How many of the given question ids are due now (for badges/summaries).
-export function dueAmong(ids: string[]): number {
-  const m = load()
-  const now = Date.now()
-  return ids.filter(id => m[id] && m[id].due <= now).length
+  const ids = results.map(r => r.questionId)
+  const { data: existing } = await supabase
+    .from('srs_schedule').select('question_id, box, due_at').eq('user_id', user.id).in('question_id', ids)
+  const cur = new Map((existing ?? []).map((r: { question_id: string; box: number; due_at: string }) =>
+    [r.question_id, { box: r.box, due: new Date(r.due_at).getTime() }]))
+
+  const rows = results.map(r => {
+    const next = step(cur.get(r.questionId), r.correct)
+    return { user_id: user.id, question_id: r.questionId, box: next.box, due_at: new Date(next.due).toISOString(), updated_at: new Date().toISOString() }
+  })
+  await supabase.from('srs_schedule').upsert(rows, { onConflict: 'user_id,question_id' })
 }

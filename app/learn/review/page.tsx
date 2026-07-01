@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { getSrs } from '@/lib/srs'
+import { fetchSrs } from '@/lib/srs'
 import { setDeck } from '@/lib/deck'
 import BottomNav from '@/components/BottomNav'
 import type { Question, AttemptResult } from '@/lib/types'
@@ -48,7 +48,7 @@ export default function ReviewQueuePage() {
         }
       }
 
-      const srs = getSrs()
+      const srs = await fetchSrs()
       const now = Date.now()
       const due = Object.keys(srs).filter(id => srs[id].due <= now && map.has(id))
       const newWrong = Array.from(recent).filter(([id, ok]) => !ok && !(id in srs)).map(([id]) => id)

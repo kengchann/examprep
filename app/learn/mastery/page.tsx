@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { computeWeakTopics, type TopicStat } from '@/lib/weakAreas'
+import { computeWeakTopics, computeReadiness, type TopicStat, type Readiness } from '@/lib/weakAreas'
 import BottomNav from '@/components/BottomNav'
 
 // Mastery map — one honest signal per topic (🔴🟡🟢), derived from attempts.
@@ -9,8 +9,15 @@ import BottomNav from '@/components/BottomNav'
 export default function MasteryPage() {
   const router = useRouter()
   const [topics, setTopics] = useState<TopicStat[] | null>(null)
+  const [readiness, setReadiness] = useState<Readiness | null>(null)
 
-  useEffect(() => { computeWeakTopics().then(setTopics).catch(() => setTopics([])) }, [])
+  useEffect(() => {
+    computeWeakTopics().then(setTopics).catch(() => setTopics([]))
+    computeReadiness().then(setReadiness).catch(() => {})
+  }, [])
+
+  const readinessColor = (score: number) => score >= 80 ? 'text-green-600' : score >= 50 ? 'text-amber-500' : 'text-red-500'
+  const readinessRing = (score: number) => score >= 80 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444'
 
   const dot = (acc: number) => acc >= 0.85 ? '🟢' : acc >= 0.6 ? '🟡' : '🔴'
   const bar = (acc: number) => acc >= 0.85 ? 'bg-green-500' : acc >= 0.6 ? 'bg-amber-400' : 'bg-red-400'
@@ -26,6 +33,21 @@ export default function MasteryPage() {
       </div>
 
       <div className="px-4 pt-5">
+        {/* Readiness score — one headline number blending accuracy + coverage */}
+        {readiness && readiness.questionsSeen > 0 && (
+          <div className="card text-center py-5 mb-4">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Exam readiness</p>
+            <p className={`text-4xl font-bold ${readinessColor(readiness.score)}`}>{readiness.score}%</p>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden mt-3 mb-2">
+              <div className="h-full rounded-full transition-all" style={{ width: `${readiness.score}%`, backgroundColor: readinessRing(readiness.score) }} />
+            </div>
+            <p className="text-xs text-gray-400">
+              {Math.round(readiness.accuracy * 100)}% accuracy · {Math.round(readiness.coverage * 100)}% of bank covered
+              ({readiness.questionsSeen}/{readiness.totalQuestions})
+            </p>
+          </div>
+        )}
+
         {topics === null ? (
           <div className="space-y-2">{[1, 2, 3, 4].map(i => <div key={i} className="card animate-pulse h-12 bg-gray-100" />)}</div>
         ) : sorted.length === 0 ? (

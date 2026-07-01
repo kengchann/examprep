@@ -63,12 +63,15 @@ export type ExamSession = {
   elapsedSeconds: number
 }
 
+export type Confidence = 'sure' | 'unsure' | 'guess'
+
 export type ExamAnswer = {
   questionId: string
   selectedIndices: number[]
   flagged: boolean
   skipped: boolean
   timeSpent: number
+  confidence?: Confidence
 }
 
 export type AttemptResult = {
@@ -84,4 +87,5 @@ export type AttemptResult = {
   correct: boolean
   flagged: boolean
   skipped: boolean
+  confidence?: Confidence
 }
