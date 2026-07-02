@@ -497,6 +497,18 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
     setConfirmed(true)
   }
 
+  // Learning mode: reveal the correct answer without it counting as a wrong
+  // guess — keeps it out of the My Mistakes deck (still shows in Skipped stats).
+  function showAnswer() {
+    const spent = Math.round((Date.now() - questionStartRef.current) / 1000)
+    setAnswers(prev => {
+      const updated = [...prev]
+      updated[current] = { ...updated[current], timeSpent: spent, peeked: true }
+      return updated
+    })
+    setConfirmed(true)
+  }
+
   function setConfidence(c: Confidence) {
     setAnswers(prev => {
       const updated = [...prev]
@@ -577,17 +589,18 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
         question_type: q.question_type, options: q.options,
         correct_indices: q.correct_indices, selected_indices: a.selectedIndices,
         explanation: q.explanation, topic: q.topic, image_url: q.image_url,
-        correct, flagged: a.flagged, skipped: a.skipped, confidence: a.confidence,
+        correct, flagged: a.flagged, skipped: a.skipped, confidence: a.confidence, peeked: a.peeked,
         match_items: q.match_items, match_buckets: q.match_buckets,
         match_correct: q.match_correct, match_assignment: a.matchAssignment,
       }
     })
     // Spaced-repetition: reschedule each reviewed question (Review Queue only).
     if (srs) applySrs(results.map(r => ({ questionId: r.questionId, correct: r.correct }))).catch(() => {})
-    // My Mistakes deck: auto-collect anything missed, from any mode. Stays until
-    // the student manually marks it mastered (best-effort, never blocks submit).
+    // My Mistakes deck: auto-collect anything missed, from any mode. Questions
+    // revealed via "Show answer" are excluded — that's a deliberate look-up, not
+    // a wrong guess. Stays until the student manually marks it mastered.
     for (const r of results) {
-      if (!r.correct) addMistake(r.questionId, bankId || null).catch(() => {})
+      if (!r.correct && !r.peeked) addMistake(r.questionId, bankId || null).catch(() => {})
     }
     // Save to localStorage for history
     const attempt = {
@@ -845,9 +858,17 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
         {/* Action buttons */}
         <div className="mt-5 pb-4 space-y-2">
           {!confirmed ? (
-            <button onClick={confirmAnswer} disabled={!hasResponse(answer)} className="btn-primary">
-              Confirm answer
-            </button>
+            <>
+              <button onClick={confirmAnswer} disabled={!hasResponse(answer)} className="btn-primary">
+                Confirm answer
+              </button>
+              {isLearning && (
+                <button onClick={showAnswer}
+                  className="w-full border border-gray-200 text-gray-500 text-sm font-medium py-2.5 rounded-xl active:scale-95">
+                  👁 Show answer
+                </button>
+              )}
+            </>
           ) : (
             <button onClick={next} disabled={submitting} className="btn-primary disabled:opacity-50">
               {current < questions.length - 1 ? 'Next question →' : submitting ? 'Submitting…' : '📊 See results →'}

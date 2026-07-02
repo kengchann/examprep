@@ -1,10 +1,18 @@
 // Bump alongside new changelog entries below.
-export const APP_VERSION = '1.7.0'
+export const APP_VERSION = '1.8.0'
 
 // Maintained by hand — add a new entry whenever a feature ships. Newest first.
 export type ChangeEntry = { date: string; title: string; items: string[] }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-06-30 (4)',
+    title: '"Show answer" in Learning mode',
+    items: [
+      'A new 👁 Show answer button in Learning mode reveals the correct answer without it counting as a wrong guess.',
+      'Revealed questions are excluded from the My Mistakes deck, and are tagged "Revealed" in the review screen for clarity.',
+    ],
+  },
   {
     date: '2026-06-30 (3)',
     title: 'Match (drag-and-drop) question type',

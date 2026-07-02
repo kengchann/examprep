@@ -268,6 +268,9 @@ function ResultsContent() {
                         {!r.correct && r.confidence === 'sure' && (
                           <span className="tag text-xs bg-orange-100 text-orange-700">⚠️ Overconfident</span>
                         )}
+                        {r.peeked && (
+                          <span className="tag text-xs bg-gray-100 text-gray-500">👁 Revealed</span>
+                        )}
                         <button onClick={() => toggleStar(r.questionId)} className="ml-auto text-base active:scale-95" title="Bookmark this question">
                           {bookmarks.has(r.questionId) ? '⭐' : '☆'}
                         </button>

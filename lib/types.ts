@@ -77,6 +77,7 @@ export type ExamAnswer = {
   timeSpent: number
   confidence?: Confidence
   matchAssignment?: number[]   // 'match' questions only: parallel to match_items, bucket index per item (-1 = unassigned)
+  peeked?: boolean   // Learning mode "Show answer" was used — excluded from the My Mistakes deck
 }
 
 export type AttemptResult = {
@@ -93,6 +94,7 @@ export type AttemptResult = {
   flagged: boolean
   skipped: boolean
   confidence?: Confidence
+  peeked?: boolean   // "Show answer" was used instead of guessing — excluded from the My Mistakes deck
   // 'match' questions only
   match_items?: string[] | null
   match_buckets?: string[] | null
