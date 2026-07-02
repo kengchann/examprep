@@ -1,4 +1,5 @@
 import { createClient } from './supabase'
+import { fetchSrs } from './srs'
 import type { Question, AttemptResult } from './types'
 
 // Adaptive "weak areas" engine. Everything is derived from data we already
@@ -81,11 +82,41 @@ export type Readiness = {
   coverage: number       // 0-1, fraction of the bank attempted at least once
   questionsSeen: number
   totalQuestions: number
+  retention: number      // 0-1, retention modifier actually applied (1 = no adjustment)
+}
+
+// How overdue (past its scheduled SRS review date) a card must be before it
+// counts against retention. A card due "today" isn't a retention problem —
+// this only flags cards that have been neglected for a while.
+const RETENTION_GRACE_DAYS = 3
+// Max fraction the score can be scaled down by, even if every scheduled card
+// is badly overdue. Keeps this a nudge, not a penalty.
+const MAX_RETENTION_PENALTY = 0.08
+
+// Read-only retention signal from the existing SRS schedule: what fraction of
+// the student's scheduled (srs_schedule) cards are overdue well past their
+// due date. Returns 1 (no adjustment) if the student has no SRS history yet,
+// or if nothing is meaningfully overdue — so this only ever nudges the score
+// down, and only when there's real neglected-review signal to act on.
+async function computeRetentionFactor(): Promise<number> {
+  const srs = await fetchSrs()
+  const entries = Object.values(srs)
+  if (entries.length === 0) return 1
+
+  const graceMs = RETENTION_GRACE_DAYS * 86_400_000
+  const now = Date.now()
+  const overdue = entries.filter(e => now - e.due > graceMs).length
+  const overdueRatio = overdue / entries.length
+
+  return 1 - overdueRatio * MAX_RETENTION_PENALTY
 }
 
 // A single "how exam-ready am I?" number, blending accuracy (how well you do
 // on what you've tried) with coverage (how much of the bank you've actually
 // tried). Weighted toward accuracy — coverage alone means little without it.
+// A small retention modifier (from the existing spaced-repetition schedule)
+// can nudge the score down slightly if reviews are badly neglected; it never
+// increases the score and is a no-op for students who don't use Review Queue.
 export async function computeReadiness(): Promise<Readiness> {
   const { topics, seenIds } = await gatherHistory()
   const accuracy = topics.length ? topics.reduce((s, t) => s + t.accuracy, 0) / topics.length : 0
@@ -95,8 +126,9 @@ export async function computeReadiness(): Promise<Readiness> {
   const totalQuestions = count ?? 0
   const coverage = totalQuestions > 0 ? Math.min(1, seenIds.size / totalQuestions) : 0
 
-  const score = Math.round((accuracy * 0.7 + coverage * 0.3) * 100)
-  return { score, accuracy, coverage, questionsSeen: seenIds.size, totalQuestions }
+  const retention = await computeRetentionFactor().catch(() => 1)
+  const score = Math.round((accuracy * 0.7 + coverage * 0.3) * 100 * retention)
+  return { score, accuracy, coverage, questionsSeen: seenIds.size, totalQuestions, retention }
 }
 
 // Order a topic's questions: ones you got wrong first, then unseen, then the

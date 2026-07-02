@@ -1,10 +1,18 @@
 // Bump alongside new changelog entries below.
-export const APP_VERSION = '1.8.0'
+export const APP_VERSION = '1.8.1'
 
 // Maintained by hand — add a new entry whenever a feature ships. Newest first.
 export type ChangeEntry = { date: string; title: string; items: string[] }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-06-30 (5)',
+    title: 'Exam readiness now accounts for review retention',
+    items: [
+      'The Exam Readiness score can now dip slightly if Review Queue cards go badly neglected — a small nudge, not a penalty, and a no-op if you don\'t use Review Queue.',
+      'Accuracy and coverage calculations are unchanged; per-topic Mastery bars, Weak Areas, and Daily Sprint are unaffected.',
+    ],
+  },
   {
     date: '2026-06-30 (4)',
     title: '"Show answer" in Learning mode',
