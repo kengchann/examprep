@@ -1,10 +1,17 @@
 // Bump alongside new changelog entries below.
-export const APP_VERSION = '1.8.1'
+export const APP_VERSION = '1.8.2'
 
 // Maintained by hand — add a new entry whenever a feature ships. Newest first.
 export type ChangeEntry = { date: string; title: string; items: string[] }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-06-30 (6)',
+    title: 'Editable bank names',
+    items: [
+      'Admins can now rename a question bank directly from Banks — tap the pencil icon next to the name.',
+    ],
+  },
   {
     date: '2026-06-30 (5)',
     title: 'Exam readiness now accounts for review retention',

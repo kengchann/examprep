@@ -19,6 +19,9 @@ export default function BanksPage() {
   const [busyBank, setBusyBank] = useState<string | null>(null)   // bank id being exported
   const [restoreMsg, setRestoreMsg] = useState('')
   const [restoring, setRestoring] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [renaming, setRenaming] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -64,6 +67,27 @@ export default function BanksPage() {
     const next = !bank.is_open
     setBanks(prev => prev.map(b => b.id === bank.id ? { ...b, is_open: next } : b))   // optimistic
     await supabase.from('question_banks').update({ is_open: next }).eq('id', bank.id)
+  }
+
+  function startRename(bank: QuestionBank) {
+    setEditingId(bank.id)
+    setEditName(bank.name)
+  }
+
+  function cancelRename() {
+    setEditingId(null)
+    setEditName('')
+  }
+
+  async function saveRename(id: string) {
+    const trimmed = editName.trim()
+    if (!trimmed) return
+    setRenaming(true)
+    setBanks(prev => prev.map(b => b.id === id ? { ...b, name: trimmed } : b))   // optimistic
+    const { error: err } = await supabase.from('question_banks').update({ name: trimmed }).eq('id', id)
+    setRenaming(false)
+    if (err) { setRestoreMsg(`❌ Rename failed: ${err.message}`); load(); return }
+    setEditingId(null); setEditName('')
   }
 
   // Download a full-fidelity JSON backup of one bank (bank info + all questions).
@@ -209,7 +233,28 @@ export default function BanksPage() {
               <div key={bank.id} className="card">
                 <div className="flex justify-between items-start">
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900">{bank.name}</p>
+                    {editingId === bank.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          className="input-field py-1.5 text-sm font-semibold"
+                          value={editName}
+                          autoFocus
+                          onChange={e => setEditName(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') saveRename(bank.id); if (e.key === 'Escape') cancelRename() }}
+                        />
+                        <button onClick={() => saveRename(bank.id)} disabled={renaming || !editName.trim()}
+                          className="text-xs font-medium text-brand-600 px-2 py-1.5 active:scale-95 disabled:opacity-50 flex-shrink-0">
+                          {renaming ? '…' : '✓'}
+                        </button>
+                        <button onClick={cancelRename} className="text-xs text-gray-400 px-2 py-1.5 active:scale-95 flex-shrink-0">✕</button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-semibold text-gray-900 truncate">{bank.name}</p>
+                        <button onClick={() => startRename(bank)} title="Rename bank"
+                          className="text-gray-300 active:scale-95 flex-shrink-0">✏️</button>
+                      </div>
+                    )}
                     {bank.description && <p className="text-sm text-gray-500 mt-0.5">{bank.description}</p>}
                     <div className="flex items-center gap-2 mt-2">
                       <span className="tag bg-brand-50 text-brand-600">{bank.category}</span>
