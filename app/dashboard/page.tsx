@@ -34,6 +34,12 @@ export default function Dashboard() {
   const router = useRouter()
   const supabase = createClient()
 
+  // Heartbeat: re-stamp last_active every 60s while dashboard open, for "online now" tracking.
+  useEffect(() => {
+    const heartbeat = setInterval(() => supabase.rpc('touch_last_active'), 60000)
+    return () => clearInterval(heartbeat)
+  }, [])
+
   // Daily Sprint status (streak + done-today) — derived from existing attempts.
   useEffect(() => {
     getSprintStatus().then(setSprint).catch(() => setSprint({ streak: 0, doneToday: false }))

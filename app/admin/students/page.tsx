@@ -16,6 +16,11 @@ function fmtDate(s: string | null) {
   return new Date(s).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
+const ONLINE_MS = 5 * 60 * 1000   // last_active within 5 min = "online now"
+function isOnline(s: string | null) {
+  return !!s && Date.now() - new Date(s).getTime() < ONLINE_MS
+}
+
 function relative(s: string | null) {
   if (!s) return 'never'
   const diff = Date.now() - new Date(s).getTime()
@@ -123,6 +128,7 @@ export default function StudentsPage() {
   const staffCount = profiles.filter(p => p.role === 'admin' || p.role === 'superadmin').length
   const studentCount = profiles.filter(p => p.role === 'student').length
   const trialCount = profiles.filter(p => p.role === 'student' && p.tier === 'trial').length
+  const onlineCount = profiles.filter(p => isOnline(p.last_active)).length
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -147,6 +153,10 @@ export default function StudentsPage() {
               <p className="text-2xl font-bold text-gray-900">{staffCount}</p>
               <p className="text-xs text-gray-400">Admins</p>
             </div>
+            <div className="card flex-1 text-center py-3">
+              <p className="text-2xl font-bold text-green-600">{onlineCount}</p>
+              <p className="text-xs text-gray-400">Online now</p>
+            </div>
           </div>
         )}
 
@@ -168,8 +178,13 @@ export default function StudentsPage() {
             {filtered.map(p => (
               <button key={p.id} onClick={() => openManage(p)}
                 className="w-full text-left card flex items-center gap-3 active:scale-[0.98]">
-                <div className="w-10 h-10 rounded-full bg-brand-50 text-brand-600 font-bold flex items-center justify-center flex-shrink-0 uppercase">
-                  {(p.full_name || p.email || '?').charAt(0)}
+                <div className="relative w-10 h-10 flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-brand-50 text-brand-600 font-bold flex items-center justify-center uppercase">
+                    {(p.full_name || p.email || '?').charAt(0)}
+                  </div>
+                  {isOnline(p.last_active) && (
+                    <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-white" title="Online now" />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
