@@ -2,6 +2,7 @@
 import Link from 'next/link'
 import BottomNav from '@/components/BottomNav'
 import { useSettings, tapFeedback, type Theme, type FontSize } from '@/lib/settings'
+import { useDesign, type Design } from '@/lib/design'
 import type { ExamMode } from '@/lib/types'
 
 // A segmented control (pick one of several).
@@ -35,6 +36,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
 
 export default function SettingsPage() {
   const { settings, update } = useSettings()
+  const { design, setDesign } = useDesign()
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -48,6 +50,18 @@ export default function SettingsPage() {
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-gray-600">Appearance</h2>
           <div className="card space-y-4">
+            <div>
+              <p className="text-sm font-medium text-gray-800 mb-2">Design</p>
+              <Segmented<Design>
+                value={design}
+                onChange={v => setDesign(v)}
+                options={[
+                  { val: 'classic', label: '◱ Classic' },
+                  { val: 'modern', label: '✨ Modern' },
+                ]}
+              />
+              <p className="text-xs text-gray-400 mt-1">Modern is a premium dark redesign (new dashboard). Classic is the original look. Switch anytime — nothing else changes.</p>
+            </div>
             <div>
               <p className="text-sm font-medium text-gray-800 mb-2">Theme</p>
               <Segmented<Theme>

@@ -10,6 +10,8 @@ import { readSession, clearSession } from '@/lib/session'
 import { setDeck } from '@/lib/deck'
 import { buildSprintDeck } from '@/lib/weakAreas'
 import { getSprintStatus, SPRINT_BANK_NAME, SPRINT_SIZE } from '@/lib/sprint'
+import { useDesign } from '@/lib/design'
+import ModernDashboard from '@/components/modern/ModernDashboard'
 import type { QuestionBank, ExamMode } from '@/lib/types'
 
 const categoryIcon: Record<string, string> = { IT: '💻', Academic: '📖', Other: '📝' }
@@ -20,7 +22,18 @@ const modes: { id: ExamMode; label: string; icon: string; desc: string }[] = [
   { id: 'custom',   label: 'Custom Mode',   icon: '⚙️', desc: 'Pick questions & time' },
 ]
 
+// Design toggle: render the Modern variant when ui-design=modern, otherwise the
+// original Classic dashboard below (untouched). Mount-gated so only the active
+// variant fetches data — no double loads, no wrong-variant flash.
 export default function Dashboard() {
+  const { design } = useDesign()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  if (!mounted) return <div className="min-h-screen bg-gray-50" />
+  return design === 'modern' ? <ModernDashboard /> : <ClassicDashboard />
+}
+
+function ClassicDashboard() {
   const [banks, setBanks] = useState<QuestionBank[]>([])
   const [userName, setUserName] = useState('')
   const [loading, setLoading] = useState(true)

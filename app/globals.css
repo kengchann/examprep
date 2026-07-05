@@ -70,3 +70,65 @@
 
 /* Font-size preference: scales every rem-based size at once. */
 html.text-large { font-size: 18px; }
+
+/* ---------------------------------------------------------------------------
+   MODERN design mode. Same trick as .dark above: a single token layer that
+   reskins every existing page (deeper navy surfaces, violet brand, Inter,
+   softer borders) without touching any component. Classic mode = these rules
+   simply don't apply. Modern always runs on top of .dark (forced by the
+   DesignProvider), so we only need to override the dark values.
+--------------------------------------------------------------------------- */
+.modern body {
+  background-color: #0B1220;
+  color: #FFFFFF;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Surfaces */
+.modern .bg-white     { background-color: #182235; }
+.modern .bg-gray-50   { background-color: #0B1220; }
+.modern .bg-gray-100  { background-color: #1F2A40; }
+.modern .bg-gray-200  { background-color: #1F2A40; }
+.modern .bg-brand-50  { background-color: rgba(124, 92, 255, 0.12); }
+
+/* Brand accents → violet */
+.modern .bg-brand-600    { background-color: #7C5CFF; }
+.modern .text-brand-600  { color: #A78BFA; }
+.modern .text-brand-200,
+.modern .text-brand-400  { color: #C4B5FD; }
+.modern .border-brand-600 { border-color: #7C5CFF; }
+.modern .border-brand-200 { border-color: rgba(124, 92, 255, 0.4); }
+.modern .accent-brand-600 { accent-color: #7C5CFF; }
+
+/* Borders — hairline, translucent */
+.modern .border-gray-50,
+.modern .border-gray-100,
+.modern .border-gray-200,
+.modern .border-gray-300 { border-color: rgba(255,255,255,0.08); }
+
+/* Text */
+.modern .text-gray-900,
+.modern .text-gray-800 { color: #FFFFFF; }
+.modern .text-gray-700 { color: #E5E7EB; }
+.modern .text-gray-600 { color: #C3C9D5; }
+.modern .text-gray-500 { color: #9CA3AF; }
+.modern .text-gray-400 { color: #8A93A6; }
+
+/* Component classes */
+.modern .card {
+  background-color: #182235;
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+.modern .input-field {
+  background-color: #111827;
+  border-color: rgba(255,255,255,0.1);
+  color: #FFFFFF;
+}
+.modern .input-field::placeholder { color: #6B7280; }
+.modern .btn-primary { background-color: #7C5CFF; }
+.modern .btn-primary:hover { background-color: #8F75FF; }
+.modern .btn-outline { border-color: #7C5CFF; color: #A78BFA; }
+
+/* Bottom nav gets the surface treatment */
+.modern nav.fixed { background-color: rgba(17, 24, 39, 0.92); backdrop-filter: blur(12px); }

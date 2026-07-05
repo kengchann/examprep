@@ -1,10 +1,20 @@
 // Bump alongside new changelog entries below.
-export const APP_VERSION = '1.8.2'
+export const APP_VERSION = '1.9.0'
 
 // Maintained by hand — add a new entry whenever a feature ships. Newest first.
 export type ChangeEntry = { date: string; title: string; items: string[] }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-07-01',
+    title: 'Modern design mode (optional)',
+    items: [
+      'New premium dark "Modern" design — switch in Settings → Appearance → Design, or tap Classic/Modern in the top bar. Instant, no reload; Classic stays the default.',
+      'Redesigned dashboard: sidebar navigation on desktop, KPI cards (daily goal, questions, accuracy, streak, XP), featured Sprint card, question-bank grid with per-bank progress, weekly charts, and achievements.',
+      'XP, levels, streaks, and achievements are calculated from your existing exam history — nothing about scoring or data changed.',
+      'Online presence for admins: Students page shows who\'s online now (green dot + count).',
+    ],
+  },
   {
     date: '2026-06-30 (6)',
     title: 'Editable bank names',
