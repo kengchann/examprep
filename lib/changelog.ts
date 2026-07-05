@@ -1,10 +1,19 @@
 // Bump alongside new changelog entries below.
-export const APP_VERSION = '1.9.0'
+export const APP_VERSION = '1.9.1'
 
 // Maintained by hand — add a new entry whenever a feature ships. Newest first.
 export type ChangeEntry = { date: string; title: string; items: string[] }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-07-01 (2)',
+    title: 'Modern design across the whole app',
+    items: [
+      'Modern mode now applies to every page: desktop sidebar + mobile bottom bar everywhere, centered content on large screens, redesigned page headers with subtle texture.',
+      'Crisp new icon set (Lucide) replaces emoji in navigation.',
+      'Polish: hover states, focus rings for keyboard users, themed scrollbars and text selection.',
+    ],
+  },
   {
     date: '2026-07-01',
     title: 'Modern design mode (optional)',

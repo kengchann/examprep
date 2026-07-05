@@ -11,6 +11,10 @@ import { buildSprintDeck, computeWeakTopics } from '@/lib/weakAreas'
 import { getSprintStatus, SPRINT_BANK_NAME, SPRINT_SIZE } from '@/lib/sprint'
 import { computeDashStats, type DashStats } from '@/lib/gamification'
 import type { QuestionBank, ExamMode } from '@/lib/types'
+import {
+  LayoutDashboard, GraduationCap, Sparkles, History as HistoryIcon, BarChart3, Settings as SettingsIcon,
+  Library, PencilLine, Users, Search, LogOut, LayoutTemplate,
+} from 'lucide-react'
 
 // ============================================================================
 // MODERN dashboard — premium dark SaaS variant (design toggle: ui-design).
@@ -19,17 +23,17 @@ import type { QuestionBank, ExamMode } from '@/lib/types'
 // ============================================================================
 
 const NAV = [
-  { href: '/dashboard', label: 'Dashboard', icon: '▦' },
-  { href: '/learn', label: 'Learn', icon: '◈' },
-  { href: '/study', label: 'Study Tools', icon: '✦' },
-  { href: '/history', label: 'History', icon: '↺' },
-  { href: '/learn/mastery', label: 'Analytics', icon: '∿' },
-  { href: '/settings', label: 'Settings', icon: '⚙' },
+  { href: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+  { href: '/learn', label: 'Learn', Icon: GraduationCap },
+  { href: '/study', label: 'Study Tools', Icon: Sparkles },
+  { href: '/history', label: 'History', Icon: HistoryIcon },
+  { href: '/learn/mastery', label: 'Analytics', Icon: BarChart3 },
+  { href: '/settings', label: 'Settings', Icon: SettingsIcon },
 ]
 const ADMIN_NAV = [
-  { href: '/admin/banks', label: 'Banks', icon: '▤' },
-  { href: '/admin/questions', label: 'Questions', icon: '✎' },
-  { href: '/admin/students', label: 'Students', icon: '☺' },
+  { href: '/admin/banks', label: 'Banks', Icon: Library },
+  { href: '/admin/questions', label: 'Questions', Icon: PencilLine },
+  { href: '/admin/students', label: 'Students', Icon: Users },
 ]
 
 const MODES: { id: ExamMode; label: string; icon: string; desc: string }[] = [
@@ -206,21 +210,21 @@ export default function ModernDashboard() {
           <span className="font-bold tracking-tight">ExamPrep</span>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {NAV.map(n => (
-            <Link key={n.href} href={n.href}
+          {NAV.map(({ href, label, Icon }) => (
+            <Link key={href} href={href}
               className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-                n.href === '/dashboard' ? 'bg-m-primary/20 text-white' : 'text-m-muted hover:text-white hover:bg-white/5'
+                href === '/dashboard' ? 'bg-m-primary/20 text-white' : 'text-m-muted hover:text-white hover:bg-white/5'
               }`}>
-              <span className="w-5 text-center">{n.icon}</span>{n.label}
+              <Icon size={17} strokeWidth={2} />{label}
             </Link>
           ))}
           {isAdmin && (
             <>
               <p className="px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-wider text-m-muted/70">Admin</p>
-              {ADMIN_NAV.map(n => (
-                <Link key={n.href} href={n.href}
+              {ADMIN_NAV.map(({ href, label, Icon }) => (
+                <Link key={href} href={href}
                   className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-m-muted hover:text-white hover:bg-white/5 transition-colors">
-                  <span className="w-5 text-center">{n.icon}</span>{n.label}
+                  <Icon size={17} strokeWidth={2} />{label}
                 </Link>
               ))}
             </>
@@ -256,16 +260,16 @@ export default function ModernDashboard() {
               placeholder="Search question banks…"
               className="w-full bg-m-surface border border-m-line rounded-xl pl-9 pr-3 py-2 text-sm placeholder:text-m-muted/60 focus:outline-none focus:ring-2 focus:ring-m-primary/50"
             />
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-m-muted text-sm">⌕</span>
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-m-muted" />
           </div>
           <button onClick={() => setDesign('classic')}
             title="Switch to Classic design"
-            className="text-xs font-medium text-m-muted border border-m-line rounded-lg px-2.5 py-1.5 hover:text-white hover:border-white/25 transition-colors whitespace-nowrap">
-            ◱ Classic
+            className="flex items-center gap-1.5 text-xs font-medium text-m-muted border border-m-line rounded-lg px-2.5 py-1.5 hover:text-white hover:border-white/25 transition-colors whitespace-nowrap">
+            <LayoutTemplate size={13} /> Classic
           </button>
           <button onClick={signOut}
-            className="text-xs font-medium text-m-muted border border-m-line rounded-lg px-2.5 py-1.5 hover:text-white hover:border-white/25 transition-colors">
-            Sign out
+            className="flex items-center gap-1.5 text-xs font-medium text-m-muted border border-m-line rounded-lg px-2.5 py-1.5 hover:text-white hover:border-white/25 transition-colors">
+            <LogOut size={13} /> Sign out
           </button>
         </div>
       </header>
@@ -479,17 +483,17 @@ export default function ModernDashboard() {
       {/* ============ MOBILE BOTTOM NAV ============ */}
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-m-surface/95 backdrop-blur-md border-t border-m-line flex">
         {[
-          { href: '/dashboard', label: 'Home', icon: '▦' },
-          { href: '/learn', label: 'Learn', icon: '◈' },
-          { href: '/study', label: 'Study', icon: '✦' },
-          { href: '/history', label: 'History', icon: '↺' },
-          { href: '/settings', label: 'Settings', icon: '⚙' },
-        ].map(t => (
-          <Link key={t.href} href={t.href}
-            className={`flex-1 flex flex-col items-center justify-center py-3 gap-0.5 text-[11px] font-medium ${
-              t.href === '/dashboard' ? 'text-m-secondary' : 'text-m-muted'
+          { href: '/dashboard', label: 'Home', Icon: LayoutDashboard },
+          { href: '/learn', label: 'Learn', Icon: GraduationCap },
+          { href: '/study', label: 'Study', Icon: Sparkles },
+          { href: '/history', label: 'History', Icon: HistoryIcon },
+          { href: '/settings', label: 'Settings', Icon: SettingsIcon },
+        ].map(({ href, label, Icon }) => (
+          <Link key={href} href={href}
+            className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-[10px] font-medium ${
+              href === '/dashboard' ? 'text-m-secondary' : 'text-m-muted'
             }`}>
-            <span className="text-lg leading-none">{t.icon}</span>{t.label}
+            <Icon size={20} strokeWidth={href === '/dashboard' ? 2.4 : 2} />{label}
           </Link>
         ))}
       </nav>

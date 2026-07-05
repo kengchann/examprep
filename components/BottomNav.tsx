@@ -2,6 +2,8 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useUserRole } from '@/lib/useUserRole'
+import { useDesign } from '@/lib/design'
+import ModernNav from '@/components/modern/ModernNav'
 
 const baseTabs = [
   { href: '/dashboard', label: 'Home', icon: '🏠' },
@@ -20,6 +22,11 @@ const settingsTab = { href: '/settings', label: 'Settings', icon: '⚙️' }
 export default function BottomNav() {
   const pathname = usePathname()
   const { isAdmin } = useUserRole()
+  const { design } = useDesign()
+
+  // Modern design: every page gets the shared modern shell (desktop sidebar +
+  // mobile bottom bar) instead of the classic tab bar.
+  if (design === 'modern') return <ModernNav isAdmin={isAdmin} />
   // Admins already have many tabs (Banks/Questions/Students); they reach Learn via
   // the Home screen card instead, to keep the bar from overflowing.
   const tabs = isAdmin

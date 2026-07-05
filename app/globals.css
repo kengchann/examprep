@@ -132,3 +132,42 @@ html.text-large { font-size: 18px; }
 
 /* Bottom nav gets the surface treatment */
 .modern nav.fixed { background-color: rgba(17, 24, 39, 0.92); backdrop-filter: blur(12px); }
+
+/* --- Whole-site modern shell polish ------------------------------------- */
+
+/* Pages that render the modern sidebar get left padding + centered content
+   on desktop so they stop stretching edge-to-edge. */
+@media (min-width: 1024px) {
+  .modern div.min-h-screen:has(> .modern-side) { padding-left: 15rem; }
+  .modern div.min-h-screen:has(> .modern-side) > div:not(.modern-side):not(.bottom-nav) {
+    max-width: 72rem;
+  }
+}
+
+/* Page hero headers (the solid violet banner blocks): become deep-navy
+   gradients with a subtle dot texture and hairline base — premium, not loud.
+   Buttons/links with bg-brand-600 keep the flat violet (element-scoped). */
+.modern div.bg-brand-600 {
+  background-color: #171331;
+  background-image:
+    radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+    linear-gradient(135deg, #221a4f 0%, #14102e 100%);
+  background-size: 18px 18px, 100% 100%;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+/* Micro-interactions */
+.modern .card { transition: border-color .15s ease, box-shadow .15s ease; }
+.modern .card:hover { border-color: rgba(255,255,255,0.16); }
+.modern button, .modern a { transition-property: color, background-color, border-color, transform, opacity; transition-duration: .15s; }
+.modern .btn-primary:active, .modern .btn-outline:active { transform: scale(0.97); }
+
+/* Focus visibility (accessibility) */
+.modern :focus-visible { outline: 2px solid #7C5CFF; outline-offset: 2px; border-radius: 6px; }
+
+/* Text selection + scrollbar */
+.modern ::selection { background: rgba(124, 92, 255, 0.45); }
+.modern ::-webkit-scrollbar { width: 10px; height: 10px; }
+.modern ::-webkit-scrollbar-track { background: #0B1220; }
+.modern ::-webkit-scrollbar-thumb { background: #2a3450; border-radius: 8px; border: 2px solid #0B1220; }
+.modern ::-webkit-scrollbar-thumb:hover { background: #39456a; }
