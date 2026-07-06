@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import BottomNav from '@/components/BottomNav'
 import { useSettings, tapFeedback, type Theme, type FontSize } from '@/lib/settings'
-import { useDesign, type Design } from '@/lib/design'
+import { useDesign, ACCENTS, type Design } from '@/lib/design'
 import type { ExamMode } from '@/lib/types'
 
 // A segmented control (pick one of several).
@@ -36,7 +36,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
 
 export default function SettingsPage() {
   const { settings, update } = useSettings()
-  const { design, setDesign } = useDesign()
+  const { design, setDesign, accent, setAccent } = useDesign()
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -60,8 +60,25 @@ export default function SettingsPage() {
                   { val: 'modern', label: '✨ Modern' },
                 ]}
               />
-              <p className="text-xs text-gray-400 mt-1">Modern is a premium dark redesign (new dashboard). Classic is the original look. Switch anytime — nothing else changes.</p>
+              <p className="text-xs text-gray-400 mt-1">Modern is a premium redesign (follows your light/dark theme). Classic is the original look. Switch anytime — nothing else changes.</p>
             </div>
+            {design === 'modern' && (
+              <div>
+                <p className="text-sm font-medium text-gray-800 mb-2">Accent color</p>
+                <div className="flex gap-2 flex-wrap">
+                  {ACCENTS.map(a => (
+                    <button key={a.id} onClick={() => setAccent(a.id)} title={a.label}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium transition-all active:scale-95 ${
+                        accent === a.id ? 'border-gray-800 dark:border-white' : 'border-gray-200'
+                      }`}>
+                      <span className="w-3.5 h-3.5 rounded-full inline-block" style={{ backgroundColor: a.color }} />
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Changes the highlight color across the Modern design.</p>
+              </div>
+            )}
             <div>
               <p className="text-sm font-medium text-gray-800 mb-2">Theme</p>
               <Segmented<Theme>

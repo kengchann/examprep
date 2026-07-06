@@ -72,102 +72,163 @@
 html.text-large { font-size: 18px; }
 
 /* ---------------------------------------------------------------------------
-   MODERN design mode. Same trick as .dark above: a single token layer that
-   reskins every existing page (deeper navy surfaces, violet brand, Inter,
-   softer borders) without touching any component. Classic mode = these rules
-   simply don't apply. Modern always runs on top of .dark (forced by the
-   DesignProvider), so we only need to override the dark values.
+   MODERN design mode — token-driven. All modern colors live in CSS variables,
+   so both themes (light/dark) and accent colors swap without touching any
+   component. Palette reskins of existing pages are scoped to .modern.dark;
+   light-modern uses the base light styles + accent overrides only.
 --------------------------------------------------------------------------- */
-.modern body {
-  background-color: #0B1220;
-  color: #FFFFFF;
-  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+/* --- Tokens: dark (default) --- */
+.modern {
+  --m-bg: 11 18 32;
+  --m-surface: 17 24 39;
+  --m-card: 24 34 53;
+  --m-text: 255 255 255;
+  --m-muted: 156 163 175;
+  --m-primary: 124 92 255;
+  --m-primary-hover: 143 117 255;
+  --m-secondary: 167 139 250;
+  --m-line: rgba(255,255,255,0.08);
+  --m-soft: rgba(255,255,255,0.05);
+  --m-soft2: rgba(255,255,255,0.10);
 }
 
-/* Surfaces */
-.modern .bg-white     { background-color: #182235; }
-.modern .bg-gray-50   { background-color: #0B1220; }
-.modern .bg-gray-100  { background-color: #1F2A40; }
-.modern .bg-gray-200  { background-color: #1F2A40; }
-.modern .bg-brand-50  { background-color: rgba(124, 92, 255, 0.12); }
-
-/* Brand accents → violet */
-.modern .bg-brand-600    { background-color: #7C5CFF; }
-.modern .text-brand-600  { color: #A78BFA; }
-.modern .text-brand-200,
-.modern .text-brand-400  { color: #C4B5FD; }
-.modern .border-brand-600 { border-color: #7C5CFF; }
-.modern .border-brand-200 { border-color: rgba(124, 92, 255, 0.4); }
-.modern .accent-brand-600 { accent-color: #7C5CFF; }
-
-/* Borders — hairline, translucent */
-.modern .border-gray-50,
-.modern .border-gray-100,
-.modern .border-gray-200,
-.modern .border-gray-300 { border-color: rgba(255,255,255,0.08); }
-
-/* Text */
-.modern .text-gray-900,
-.modern .text-gray-800 { color: #FFFFFF; }
-.modern .text-gray-700 { color: #E5E7EB; }
-.modern .text-gray-600 { color: #C3C9D5; }
-.modern .text-gray-500 { color: #9CA3AF; }
-.modern .text-gray-400 { color: #8A93A6; }
-
-/* Component classes */
-.modern .card {
-  background-color: #182235;
-  border-color: rgba(255,255,255,0.08);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.4);
-}
-.modern .input-field {
-  background-color: #111827;
-  border-color: rgba(255,255,255,0.1);
-  color: #FFFFFF;
-}
-.modern .input-field::placeholder { color: #6B7280; }
-.modern .btn-primary { background-color: #7C5CFF; }
-.modern .btn-primary:hover { background-color: #8F75FF; }
-.modern .btn-outline { border-color: #7C5CFF; color: #A78BFA; }
-
-/* Bottom nav gets the surface treatment */
-.modern nav.fixed { background-color: rgba(17, 24, 39, 0.92); backdrop-filter: blur(12px); }
-
-/* --- Whole-site modern shell polish ------------------------------------- */
-
-/* Pages that render the modern sidebar get left padding + centered content
-   on desktop so they stop stretching edge-to-edge. */
-@media (min-width: 1024px) {
-  .modern div.min-h-screen:has(> .modern-side) { padding-left: 15rem; }
-  .modern div.min-h-screen:has(> .modern-side) > div:not(.modern-side):not(.bottom-nav) {
-    max-width: 72rem;
-  }
+/* --- Tokens: light --- */
+.modern:not(.dark) {
+  --m-bg: 245 246 250;
+  --m-surface: 255 255 255;
+  --m-card: 255 255 255;
+  --m-text: 15 23 42;
+  --m-muted: 100 116 139;
+  --m-secondary: var(--m-primary);
+  --m-line: rgba(15,23,42,0.08);
+  --m-soft: rgba(15,23,42,0.04);
+  --m-soft2: rgba(15,23,42,0.10);
 }
 
-/* Page hero headers (the solid violet banner blocks): become deep-navy
-   gradients with a subtle dot texture and hairline base — premium, not loud.
-   Buttons/links with bg-brand-600 keep the flat violet (element-scoped). */
-.modern div.bg-brand-600 {
-  background-color: #171331;
-  background-image:
-    radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
-    linear-gradient(135deg, #221a4f 0%, #14102e 100%);
-  background-size: 18px 18px, 100% 100%;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
-}
+/* --- Accent color options (Settings → Design accent) --- */
+html.modern[data-accent="blue"]    { --m-primary: 59 130 246;  --m-primary-hover: 96 165 250;  --m-secondary: 147 197 253; }
+html.modern[data-accent="emerald"] { --m-primary: 16 185 129;  --m-primary-hover: 52 211 153;  --m-secondary: 110 231 183; }
+html.modern[data-accent="rose"]    { --m-primary: 244 63 94;   --m-primary-hover: 251 113 133; --m-secondary: 253 164 175; }
+html.modern[data-accent="amber"]   { --m-primary: 217 119 6;   --m-primary-hover: 245 158 11;  --m-secondary: 252 211 77; }
+.modern:not(.dark)[data-accent] { --m-secondary: var(--m-primary); }
+
+/* --- Shared (both themes) --- */
+.modern body { font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif; }
+
+/* Brand accents follow the accent token in BOTH themes */
+.modern .bg-brand-600    { background-color: rgb(var(--m-primary)); }
+.modern .text-brand-600  { color: rgb(var(--m-secondary)); }
+.modern .border-brand-600 { border-color: rgb(var(--m-primary)); }
+.modern .border-brand-200 { border-color: rgb(var(--m-primary) / 0.4); }
+.modern .accent-brand-600 { accent-color: rgb(var(--m-primary)); }
+.modern .bg-brand-50  { background-color: rgb(var(--m-primary) / 0.12); }
+.modern .btn-primary { background-color: rgb(var(--m-primary)); }
+.modern .btn-primary:hover { background-color: rgb(var(--m-primary-hover)); }
+.modern .btn-outline { border-color: rgb(var(--m-primary)); color: rgb(var(--m-secondary)); }
 
 /* Micro-interactions */
 .modern .card { transition: border-color .15s ease, box-shadow .15s ease; }
-.modern .card:hover { border-color: rgba(255,255,255,0.16); }
 .modern button, .modern a { transition-property: color, background-color, border-color, transform, opacity; transition-duration: .15s; }
 .modern .btn-primary:active, .modern .btn-outline:active { transform: scale(0.97); }
 
 /* Focus visibility (accessibility) */
-.modern :focus-visible { outline: 2px solid #7C5CFF; outline-offset: 2px; border-radius: 6px; }
+.modern :focus-visible { outline: 2px solid rgb(var(--m-primary)); outline-offset: 2px; border-radius: 6px; }
+.modern ::selection { background: rgb(var(--m-primary) / 0.4); }
 
-/* Text selection + scrollbar */
-.modern ::selection { background: rgba(124, 92, 255, 0.45); }
-.modern ::-webkit-scrollbar { width: 10px; height: 10px; }
-.modern ::-webkit-scrollbar-track { background: #0B1220; }
-.modern ::-webkit-scrollbar-thumb { background: #2a3450; border-radius: 8px; border: 2px solid #0B1220; }
-.modern ::-webkit-scrollbar-thumb:hover { background: #39456a; }
+/* Sprint-hero surface + decorative art colors, accent- and theme-aware */
+.modern .m-hero {
+  background-color: rgb(var(--m-card));
+  background-image: linear-gradient(135deg, rgb(var(--m-primary) / 0.22), transparent 65%);
+  --m-art1: rgb(var(--m-primary) / 0.30);
+  --m-art2: rgb(var(--m-primary) / 0.16);
+}
+
+/* Pages that render the modern sidebar get left padding + centered content on
+   desktop. Fixed overlays (modals) are excluded — clamping them broke the
+   Students manage sheet. */
+@media (min-width: 1024px) {
+  .modern div.min-h-screen:has(> .modern-side) { padding-left: 15rem; }
+  .modern div.min-h-screen:has(> .modern-side) > div:not(.modern-side):not(.bottom-nav):not(.fixed) {
+    max-width: 72rem;
+  }
+}
+
+/* Page hero headers (the solid violet banner blocks) — theme-aware gradient
+   with dot texture. Element-scoped to div so buttons keep flat accent. */
+.modern.dark div.bg-brand-600 {
+  background-color: #171331;
+  background-image:
+    radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+    linear-gradient(135deg, rgb(var(--m-primary) / 0.28) 0%, rgb(17 19 49 / 0.4) 100%);
+  background-size: 18px 18px, 100% 100%;
+  border-bottom: 1px solid var(--m-line);
+}
+.modern:not(.dark) div.bg-brand-600 {
+  background-color: #fff;
+  background-image:
+    radial-gradient(rgb(var(--m-primary) / 0.10) 1px, transparent 1px),
+    linear-gradient(135deg, rgb(var(--m-primary) / 0.14) 0%, rgb(255 255 255 / 0.6) 100%);
+  background-size: 18px 18px, 100% 100%;
+  border-bottom: 1px solid var(--m-line);
+}
+/* Light-modern headers: white/violet header text becomes readable ink */
+.modern:not(.dark) div.bg-brand-600 .text-white { color: #1e1b4b; }
+.modern:not(.dark) div.bg-brand-600 .text-brand-100,
+.modern:not(.dark) div.bg-brand-600 .text-brand-200 { color: rgb(var(--m-primary)); }
+.modern:not(.dark) div.bg-brand-600 .border-brand-400 { border-color: rgb(var(--m-primary) / 0.5); }
+/* Light-modern body bg */
+.modern:not(.dark) body { background-color: rgb(var(--m-bg)); }
+.modern:not(.dark) .bg-gray-50 { background-color: rgb(var(--m-bg)); }
+
+/* --- Dark-modern page reskin (runs only when the dark theme is on) --- */
+.modern.dark body { background-color: rgb(var(--m-bg)); color: rgb(var(--m-text)); }
+
+/* Surfaces */
+.modern.dark .bg-white     { background-color: rgb(var(--m-card)); }
+.modern.dark .bg-gray-50   { background-color: rgb(var(--m-bg)); }
+.modern.dark .bg-gray-100  { background-color: #1F2A40; }
+.modern.dark .bg-gray-200  { background-color: #1F2A40; }
+
+/* Violet-tinted text on dark */
+.modern.dark .text-brand-200,
+.modern.dark .text-brand-400 { color: rgb(var(--m-secondary)); }
+
+/* Borders — hairline, translucent */
+.modern.dark .border-gray-50,
+.modern.dark .border-gray-100,
+.modern.dark .border-gray-200,
+.modern.dark .border-gray-300 { border-color: var(--m-line); }
+
+/* Text */
+.modern.dark .text-gray-900,
+.modern.dark .text-gray-800 { color: rgb(var(--m-text)); }
+.modern.dark .text-gray-700 { color: #E5E7EB; }
+.modern.dark .text-gray-600 { color: #C3C9D5; }
+.modern.dark .text-gray-500 { color: rgb(var(--m-muted)); }
+.modern.dark .text-gray-400 { color: #8A93A6; }
+
+/* Component classes */
+.modern.dark .card {
+  background-color: rgb(var(--m-card));
+  border-color: var(--m-line);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+.modern.dark .card:hover { border-color: rgba(255,255,255,0.16); }
+.modern:not(.dark) .card:hover { border-color: rgba(15,23,42,0.18); }
+.modern.dark .input-field {
+  background-color: rgb(var(--m-surface));
+  border-color: rgba(255,255,255,0.1);
+  color: rgb(var(--m-text));
+}
+.modern.dark .input-field::placeholder { color: #6B7280; }
+
+/* Bottom nav surface */
+.modern.dark nav.fixed { background-color: rgba(17, 24, 39, 0.92); backdrop-filter: blur(12px); }
+.modern:not(.dark) nav.fixed { background-color: rgba(255, 255, 255, 0.92); backdrop-filter: blur(12px); }
+
+/* Scrollbar (dark only; light keeps native) */
+.modern.dark ::-webkit-scrollbar { width: 10px; height: 10px; }
+.modern.dark ::-webkit-scrollbar-track { background: rgb(var(--m-bg)); }
+.modern.dark ::-webkit-scrollbar-thumb { background: #2a3450; border-radius: 8px; border: 2px solid rgb(var(--m-bg)); }
+.modern.dark ::-webkit-scrollbar-thumb:hover { background: #39456a; }

@@ -36,13 +36,13 @@ export default function ModernNav({ isAdmin }: { isAdmin: boolean }) {
       <aside className="modern-side hidden lg:flex fixed inset-y-0 left-0 w-60 flex-col bg-m-surface border-r border-m-line z-40">
         <Link href="/dashboard" className="flex items-center gap-2.5 px-5 h-16 border-b border-m-line">
           <span className="w-8 h-8 rounded-xl bg-m-primary flex items-center justify-center text-base">📋</span>
-          <span className="font-bold tracking-tight text-white">ExamPrep</span>
+          <span className="font-bold tracking-tight text-m-text">ExamPrep</span>
         </Link>
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {MAIN.map(({ href, label, Icon }) => (
             <Link key={href} href={href}
               className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-                active(href) ? 'bg-m-primary/20 text-white' : 'text-m-muted hover:text-white hover:bg-white/5'
+                active(href) ? 'bg-m-primary/20 text-m-text' : 'text-m-muted hover:text-m-text hover:bg-m-soft'
               }`}>
               <Icon size={17} strokeWidth={2} />{label}
             </Link>
@@ -53,7 +53,7 @@ export default function ModernNav({ isAdmin }: { isAdmin: boolean }) {
               {ADMIN.map(({ href, label, Icon }) => (
                 <Link key={href} href={href}
                   className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-                    active(href) ? 'bg-m-primary/20 text-white' : 'text-m-muted hover:text-white hover:bg-white/5'
+                    active(href) ? 'bg-m-primary/20 text-m-text' : 'text-m-muted hover:text-m-text hover:bg-m-soft'
                   }`}>
                   <Icon size={17} strokeWidth={2} />{label}
                 </Link>

@@ -46,7 +46,7 @@ const fmtMin = (s: number) => s >= 3600 ? `${(s / 3600).toFixed(1)}h` : `${Math.
 
 // --- tiny SVG charts (no chart library needed) ------------------------------
 
-function LineChart({ points, height = 120, color = '#7C5CFF' }: { points: number[]; height?: number; color?: string }) {
+function LineChart({ points, height = 120, color = 'rgb(var(--m-primary))' }: { points: number[]; height?: number; color?: string }) {
   const w = 300, h = height, pad = 8
   const max = Math.max(...points, 1)
   const step = (w - pad * 2) / Math.max(points.length - 1, 1)
@@ -64,13 +64,13 @@ function LineChart({ points, height = 120, color = '#7C5CFF' }: { points: number
       <path d={area} fill="url(#lg)" />
       <path d={path} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
       {points.map((v, i) => (
-        <circle key={i} cx={pad + i * step} cy={y(v)} r="3" fill="#0B1220" stroke={color} strokeWidth="2" />
+        <circle key={i} cx={pad + i * step} cy={y(v)} r="3" style={{ fill: 'rgb(var(--m-card))' }} stroke={color} strokeWidth="2" />
       ))}
     </svg>
   )
 }
 
-function Ring({ pct, size = 110, stroke = 8, color = '#A78BFA', label, sub }: {
+function Ring({ pct, size = 110, stroke = 8, color = 'rgb(var(--m-secondary))', label, sub }: {
   pct: number; size?: number; stroke?: number; color?: string; label: string; sub?: string
 }) {
   const r = (size - stroke) / 2
@@ -78,14 +78,14 @@ function Ring({ pct, size = 110, stroke = 8, color = '#A78BFA', label, sub }: {
   return (
     <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" style={{ stroke: 'var(--m-soft2)' }} strokeWidth={stroke} />
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke}
           strokeDasharray={c} strokeDashoffset={c * (1 - Math.min(pct, 1))} strokeLinecap="round"
           style={{ transition: 'stroke-dashoffset 0.8s ease' }} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-white font-bold text-lg leading-none">{label}</span>
-        {sub && <span className="text-[10px] text-white/60 mt-0.5">{sub}</span>}
+        <span className="text-m-text font-bold text-lg leading-none">{label}</span>
+        {sub && <span className="text-[10px] text-m-muted mt-0.5">{sub}</span>}
       </div>
     </div>
   )
@@ -95,8 +95,8 @@ function Ring({ pct, size = 110, stroke = 8, color = '#A78BFA', label, sub }: {
 function Mountains() {
   return (
     <svg viewBox="0 0 400 140" preserveAspectRatio="xMidYMax slice" className="absolute inset-x-0 bottom-0 w-full h-28 opacity-60 pointer-events-none">
-      <path d="M0 140 L70 55 L120 100 L180 30 L250 110 L310 60 L400 140 Z" fill="#241d4d" />
-      <path d="M0 140 L100 85 L170 120 L240 70 L320 125 L400 90 L400 140 Z" fill="#181238" />
+      <path d="M0 140 L70 55 L120 100 L180 30 L250 110 L310 60 L400 140 Z" style={{ fill: 'var(--m-art1)' }} />
+      <path d="M0 140 L100 85 L170 120 L240 70 L320 125 L400 90 L400 140 Z" style={{ fill: 'var(--m-art2)' }} />
     </svg>
   )
 }
@@ -107,17 +107,17 @@ function Kpi({ icon, label, value, trend, trendGood, bar }: {
   icon: string; label: string; value: string; trend?: string; trendGood?: boolean; bar?: number
 }) {
   return (
-    <div className="bg-m-card border border-m-line rounded-2xl p-4 hover:border-white/20 transition-colors">
+    <div className="bg-m-card border border-m-line rounded-2xl p-4 hover:border-m-line2 transition-colors">
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs text-m-muted font-medium">{label}</p>
         <span className="text-base opacity-80">{icon}</span>
       </div>
-      <p className="text-2xl font-bold text-white leading-none">{value}</p>
+      <p className="text-2xl font-bold text-m-text leading-none">{value}</p>
       {trend && (
-        <p className={`text-[11px] mt-1.5 font-medium ${trendGood ? 'text-green-400' : 'text-m-muted'}`}>{trend}</p>
+        <p className={`text-[11px] mt-1.5 font-medium ${trendGood ? 'text-green-600 dark:text-green-400' : 'text-m-muted'}`}>{trend}</p>
       )}
       {bar !== undefined && (
-        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden mt-2">
+        <div className="h-1.5 bg-m-soft2 rounded-full overflow-hidden mt-2">
           <div className="h-full rounded-full bg-m-primary transition-all duration-700" style={{ width: `${Math.min(bar, 1) * 100}%` }} />
         </div>
       )}
@@ -201,7 +201,7 @@ export default function ModernDashboard() {
   const qDelta = stats ? stats.questionsToday - stats.questionsYesterday : 0
 
   return (
-    <div className="min-h-screen bg-m-bg text-white lg:pl-60" style={{ fontFamily: 'var(--font-inter), ui-sans-serif, system-ui' }}>
+    <div className="min-h-screen bg-m-bg text-m-text lg:pl-60" style={{ fontFamily: 'var(--font-inter), ui-sans-serif, system-ui' }}>
 
       {/* ============ SIDEBAR (desktop) ============ */}
       <aside className="hidden lg:flex fixed inset-y-0 left-0 w-60 flex-col bg-m-surface border-r border-m-line z-40">
@@ -213,7 +213,7 @@ export default function ModernDashboard() {
           {NAV.map(({ href, label, Icon }) => (
             <Link key={href} href={href}
               className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-                href === '/dashboard' ? 'bg-m-primary/20 text-white' : 'text-m-muted hover:text-white hover:bg-white/5'
+                href === '/dashboard' ? 'bg-m-primary/20 text-m-text' : 'text-m-muted hover:text-m-text hover:bg-m-soft'
               }`}>
               <Icon size={17} strokeWidth={2} />{label}
             </Link>
@@ -223,7 +223,7 @@ export default function ModernDashboard() {
               <p className="px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-wider text-m-muted/70">Admin</p>
               {ADMIN_NAV.map(({ href, label, Icon }) => (
                 <Link key={href} href={href}
-                  className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-m-muted hover:text-white hover:bg-white/5 transition-colors">
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-m-muted hover:text-m-text hover:bg-m-soft transition-colors">
                   <Icon size={17} strokeWidth={2} />{label}
                 </Link>
               ))}
@@ -242,7 +242,7 @@ export default function ModernDashboard() {
                 <p className="text-[11px] text-m-muted">Level {stats.level} · {stats.xp.toLocaleString()} XP</p>
               </div>
             </div>
-            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+            <div className="h-1.5 bg-m-soft2 rounded-full overflow-hidden">
               <div className="h-full bg-m-primary rounded-full transition-all duration-700" style={{ width: `${stats.levelProgress * 100}%` }} />
             </div>
           </div>
@@ -264,11 +264,11 @@ export default function ModernDashboard() {
           </div>
           <button onClick={() => setDesign('classic')}
             title="Switch to Classic design"
-            className="flex items-center gap-1.5 text-xs font-medium text-m-muted border border-m-line rounded-lg px-2.5 py-1.5 hover:text-white hover:border-white/25 transition-colors whitespace-nowrap">
+            className="flex items-center gap-1.5 text-xs font-medium text-m-muted border border-m-line rounded-lg px-2.5 py-1.5 hover:text-m-text hover:border-m-line2 transition-colors whitespace-nowrap">
             <LayoutTemplate size={13} /> Classic
           </button>
           <button onClick={signOut}
-            className="flex items-center gap-1.5 text-xs font-medium text-m-muted border border-m-line rounded-lg px-2.5 py-1.5 hover:text-white hover:border-white/25 transition-colors">
+            className="flex items-center gap-1.5 text-xs font-medium text-m-muted border border-m-line rounded-lg px-2.5 py-1.5 hover:text-m-text hover:border-m-line2 transition-colors">
             <LogOut size={13} /> Sign out
           </button>
         </div>
@@ -286,7 +286,7 @@ export default function ModernDashboard() {
 
         {/* Trial notice */}
         {isTrial && (
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl px-4 py-3 text-sm text-amber-200 animate-fade-up">
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl px-4 py-3 text-sm text-amber-700 dark:text-amber-200 animate-fade-up">
             🎁 Free trial — you can preview the first 20 questions of each bank. Ask your admin to unlock everything.
           </div>
         )}
@@ -305,7 +305,7 @@ export default function ModernDashboard() {
               Resume
             </button>
             <button onClick={() => { if (confirm('Discard your in-progress exam?')) { clearSession(); setResume(null) } }}
-              className="text-m-muted text-sm px-2 hover:text-white">✕</button>
+              className="text-m-muted text-sm px-2 hover:text-m-text">✕</button>
           </div>
         )}
 
@@ -336,7 +336,7 @@ export default function ModernDashboard() {
         {/* Sprint + Weekly chart */}
         <div className="grid lg:grid-cols-3 gap-4">
           {/* Sprint hero */}
-          <div className="lg:col-span-2 relative overflow-hidden rounded-3xl border border-m-line bg-gradient-to-br from-[#1b1740] via-[#171331] to-m-surface p-6 animate-fade-up">
+          <div className="lg:col-span-2 relative overflow-hidden rounded-3xl border border-m-line m-hero p-6 animate-fade-up">
             <Mountains />
             <div className="relative flex flex-col sm:flex-row sm:items-center gap-5">
               <div className="flex-1">
@@ -345,7 +345,7 @@ export default function ModernDashboard() {
                 {focusTopics.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-3">
                     {focusTopics.map(t => (
-                      <span key={t} className="text-[11px] font-medium bg-white/10 border border-white/10 rounded-full px-2.5 py-1">{t}</span>
+                      <span key={t} className="text-[11px] font-medium bg-m-soft2 border border-m-line rounded-full px-2.5 py-1">{t}</span>
                     ))}
                   </div>
                 )}
@@ -383,7 +383,7 @@ export default function ModernDashboard() {
         <section className="animate-fade-up">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold">Question Banks</h2>
-            {isAdmin && <Link href="/admin/banks" className="text-xs text-m-secondary hover:text-white">Manage →</Link>}
+            {isAdmin && <Link href="/admin/banks" className="text-xs text-m-secondary hover:text-m-text">Manage →</Link>}
           </div>
           {loading ? (
             <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -412,7 +412,7 @@ export default function ModernDashboard() {
                     <div className="flex items-center justify-between text-[11px] text-m-muted mb-1">
                       <span>Progress</span><span>{Math.round(pct * 100)}%</span>
                     </div>
-                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden mb-3">
+                    <div className="h-1.5 bg-m-soft2 rounded-full overflow-hidden mb-3">
                       <div className="h-full bg-m-primary rounded-full transition-all duration-700" style={{ width: `${pct * 100}%` }} />
                     </div>
                     <div className="flex items-center justify-between">
@@ -446,16 +446,16 @@ export default function ModernDashboard() {
                   <LineChart points={stats.week.map(d => Math.round(d.accuracy * 100))} height={90} color="#22C55E" />
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-center">
-                  <div className="bg-white/5 rounded-xl py-3">
+                  <div className="bg-m-soft rounded-xl py-3">
                     <p className="text-lg font-bold">{fmtMin(stats.studyTimeWeek)}</p>
                     <p className="text-[11px] text-m-muted">Study time (7d)</p>
                   </div>
-                  <div className="bg-white/5 rounded-xl py-3">
+                  <div className="bg-m-soft rounded-xl py-3">
                     <p className="text-lg font-bold">{stats.week.reduce((s, d) => s + d.questions, 0)}</p>
                     <p className="text-[11px] text-m-muted">Questions (7d)</p>
                   </div>
                 </div>
-                <Link href="/learn/mastery" className="block text-center text-xs text-m-secondary hover:text-white mt-4">
+                <Link href="/learn/mastery" className="block text-center text-xs text-m-secondary hover:text-m-text mt-4">
                   Full mastery breakdown →
                 </Link>
               </>
@@ -469,7 +469,7 @@ export default function ModernDashboard() {
               {(stats?.achievements ?? []).map(a => (
                 <div key={a.id} title={a.desc}
                   className={`flex flex-col items-center text-center rounded-2xl border p-3 transition-all ${
-                    a.unlocked ? 'border-m-primary/40 bg-m-primary/10' : 'border-m-line bg-white/[0.02] opacity-40 grayscale'
+                    a.unlocked ? 'border-m-primary/40 bg-m-primary/10' : 'border-m-line bg-m-soft opacity-40 grayscale'
                   }`}>
                   <span className="text-2xl mb-1">{a.icon}</span>
                   <p className="text-[11px] font-semibold leading-tight">{a.title}</p>
@@ -507,7 +507,7 @@ export default function ModernDashboard() {
                 <h3 className="font-semibold">{modeFor.name}</h3>
                 <p className="text-xs text-m-muted">{modeFor.question_count} questions · choose a mode</p>
               </div>
-              <button onClick={() => setModeFor(null)} className="text-m-muted text-2xl leading-none hover:text-white">×</button>
+              <button onClick={() => setModeFor(null)} className="text-m-muted text-2xl leading-none hover:text-m-text">×</button>
             </div>
             <div className="space-y-2">
               {MODES.map(m => (

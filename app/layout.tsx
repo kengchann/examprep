@@ -29,7 +29,7 @@ export const viewport: Viewport = {
 
 // Runs before the page paints so dark mode / large text / modern design apply
 // with no flash.
-const themeScript = `(function(){try{var s=JSON.parse(localStorage.getItem('examprep_settings')||'{}');var t=s.theme||'system';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme:dark)').matches);var e=document.documentElement;if(d)e.classList.add('dark');if(s.fontSize==='large')e.classList.add('text-large');if(localStorage.getItem('ui-design')==='modern'){e.classList.add('modern');e.classList.add('dark');}}catch(_){}})();`
+const themeScript = `(function(){try{var s=JSON.parse(localStorage.getItem('examprep_settings')||'{}');var t=s.theme||'system';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme:dark)').matches);var e=document.documentElement;if(d)e.classList.add('dark');if(s.fontSize==='large')e.classList.add('text-large');if(localStorage.getItem('ui-design')==='modern')e.classList.add('modern');var a=localStorage.getItem('ui-accent');if(a&&a!=='violet')e.dataset.accent=a;}catch(_){}})();`
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

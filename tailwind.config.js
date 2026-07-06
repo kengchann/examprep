@@ -18,19 +18,24 @@ module.exports = {
           800: '#3C3489',
           900: '#26215C',
         },
-        // Modern-mode design tokens (premium dark SaaS palette)
+        // Modern-mode design tokens — CSS variables so light/dark themes and
+        // accent colors swap without touching components (see globals.css).
         m: {
-          bg:      '#0B1220',
-          surface: '#111827',
-          card:    '#182235',
-          primary: '#7C5CFF',
-          primaryHover: '#8F75FF',
-          secondary: '#A78BFA',
-          muted:   '#9CA3AF',
+          bg:      'rgb(var(--m-bg) / <alpha-value>)',
+          surface: 'rgb(var(--m-surface) / <alpha-value>)',
+          card:    'rgb(var(--m-card) / <alpha-value>)',
+          text:    'rgb(var(--m-text) / <alpha-value>)',
+          muted:   'rgb(var(--m-muted) / <alpha-value>)',
+          primary: 'rgb(var(--m-primary) / <alpha-value>)',
+          primaryHover: 'rgb(var(--m-primary-hover) / <alpha-value>)',
+          secondary: 'rgb(var(--m-secondary) / <alpha-value>)',
+          soft:  'var(--m-soft)',
+          soft2: 'var(--m-soft2)',
         },
       },
       borderColor: {
-        'm-line': 'rgba(255,255,255,0.08)',
+        'm-line': 'var(--m-line)',
+        'm-line2': 'var(--m-soft2)',
       },
       keyframes: {
         'fade-up': {
