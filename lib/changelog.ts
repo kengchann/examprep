@@ -1,10 +1,17 @@
 // Bump alongside new changelog entries below.
-export const APP_VERSION = '1.10.0'
+export const APP_VERSION = '1.10.1'
 
 // Maintained by hand — add a new entry whenever a feature ships. Newest first.
 export type ChangeEntry = { date: string; title: string; items: string[] }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-07-01 (4)',
+    title: 'Modern design is now the default',
+    items: [
+      'New and existing users now get the Modern design by default. Anyone who explicitly chose Classic keeps it — and you can always switch back in Settings → Appearance → Design.',
+    ],
+  },
   {
     date: '2026-07-01 (3)',
     title: 'Modern light theme + accent colors',

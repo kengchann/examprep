@@ -21,9 +21,10 @@ export const ACCENTS: { id: Accent; label: string; color: string }[] = [
   { id: 'amber', label: 'Amber', color: '#D97706' },
 ]
 
+// Modern is the default; users who explicitly picked Classic keep it.
 export function readDesign(): Design {
   if (typeof window === 'undefined') return 'classic'
-  try { return localStorage.getItem(KEY) === 'modern' ? 'modern' : 'classic' } catch { return 'classic' }
+  try { return localStorage.getItem(KEY) === 'classic' ? 'classic' : 'modern' } catch { return 'modern' }
 }
 
 function readAccent(): Accent {
