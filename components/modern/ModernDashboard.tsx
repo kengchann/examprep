@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import { useUserRole } from '@/lib/useUserRole'
 import { useDesign } from '@/lib/design'
-import { readSession, clearSession } from '@/lib/session'
+import { fetchLatestSession, writeSession, clearSession, clearCloudSession } from '@/lib/session'
 import { setDeck } from '@/lib/deck'
 import { buildSprintDeck, computeWeakTopics } from '@/lib/weakAreas'
 import { getSprintStatus, SPRINT_BANK_NAME, SPRINT_SIZE } from '@/lib/sprint'
@@ -151,8 +151,11 @@ export default function ModernDashboard() {
       setUserName(user.user_metadata?.full_name?.split(' ')[0] || 'there')
       supabase.rpc('touch_last_active')
 
-      const saved = readSession()
-      if (saved) setResume({ bankId: saved.meta.bankId, bankName: saved.meta.bankName, mode: saved.meta.mode })
+      const saved = await fetchLatestSession()
+      if (saved) {
+        writeSession(saved.meta, saved.state)
+        setResume({ bankId: saved.meta.bankId, bankName: saved.meta.bankName, mode: saved.meta.mode })
+      }
 
       const [banksRes, countsRes, s, sp, topics] = await Promise.all([
         supabase.from('question_banks').select('*').order('created_at', { ascending: false }),
@@ -304,7 +307,7 @@ export default function ModernDashboard() {
               className="bg-m-primary hover:bg-m-primaryHover text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors">
               Resume
             </button>
-            <button onClick={() => { if (confirm('Discard your in-progress exam?')) { clearSession(); setResume(null) } }}
+            <button onClick={() => { if (confirm('Discard your in-progress exam?')) { clearSession(); clearCloudSession().catch(() => {}); setResume(null) } }}
               className="text-m-muted text-sm px-2 hover:text-m-text">✕</button>
           </div>
         )}

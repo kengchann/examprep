@@ -14,6 +14,9 @@ export type Question = {
   image_url: string | null    // optional exhibit image (Supabase storage)
   order_index: number
   created_at: string
+  // Primary AWS service this question tests (e.g. "Lambda"), finer-grained
+  // than `topic`. Null/undefined when not (yet) classified — never guessed.
+  service?: string | null
   // Only present for question_type === 'match' (drag-and-drop matching).
   match_items?: string[] | null      // draggable statements
   match_buckets?: string[] | null    // category targets

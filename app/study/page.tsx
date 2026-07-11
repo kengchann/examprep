@@ -154,6 +154,20 @@ export default function StudyPage() {
               )}
             </div>
 
+            {/* Study by Service — drill one AWS service at a time */}
+            <div className="card">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-2xl">🔧</span>
+                <div className="flex-1">
+                  <p className="font-semibold text-gray-900">Study by Service</p>
+                  <p className="text-xs text-gray-400">Practice every question for one AWS service (Lambda, S3, IAM…)</p>
+                </div>
+              </div>
+              <Link href="/study/service" className="btn-outline text-sm py-3 block text-center">
+                Browse services →
+              </Link>
+            </div>
+
             {/* My Mistakes — persistent, manually-curated deck */}
             <div className="card">
               <div className="flex items-center gap-3 mb-2">

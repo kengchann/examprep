@@ -1,10 +1,27 @@
 // Bump alongside new changelog entries below.
-export const APP_VERSION = '1.10.1'
+export const APP_VERSION = '1.11.0'
 
 // Maintained by hand — add a new entry whenever a feature ships. Newest first.
 export type ChangeEntry = { date: string; title: string; items: string[] }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-07-12 (2)',
+    title: 'Resume your exam on any device',
+    items: [
+      'Pausing an exam (Save & Exit) now also syncs your progress to the cloud — pause on your phone, pick it up on your computer, and vice versa.',
+      'If you have a paused exam on two devices, the newer one wins automatically.',
+    ],
+  },
+  {
+    date: '2026-07-12',
+    title: 'Study by Service',
+    items: [
+      'New "Study by Service" under Study Tools — practice every question for one AWS service (Lambda, S3, IAM, DynamoDB, etc.) instead of a broad topic.',
+      'Questions are auto-classified by primary AWS service on import; existing banks can be backfilled from Admin → Questions → Auto-tag services.',
+      'Topic-based mastery, weak areas, and exam behavior are unchanged — this is a new, separate layer.',
+    ],
+  },
   {
     date: '2026-07-01 (4)',
     title: 'Modern design is now the default',

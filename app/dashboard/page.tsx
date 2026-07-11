@@ -6,7 +6,7 @@ import BottomNav from '@/components/BottomNav'
 import Link from 'next/link'
 import { useUserRole } from '@/lib/useUserRole'
 import { useSettings } from '@/lib/settings'
-import { readSession, clearSession } from '@/lib/session'
+import { fetchLatestSession, writeSession, clearSession, clearCloudSession } from '@/lib/session'
 import { setDeck } from '@/lib/deck'
 import { buildSprintDeck } from '@/lib/weakAreas'
 import { getSprintStatus, SPRINT_BANK_NAME, SPRINT_SIZE } from '@/lib/sprint'
@@ -73,16 +73,20 @@ function ClassicDashboard() {
     if (settings.defaultMode !== 'ask') setSelectedMode(settings.defaultMode)
   }, [settings.defaultMode])
 
-  // Detect an in-progress exam that can be resumed.
+  // Detect an in-progress exam that can be resumed — checks both this device
+  // (localStorage) and the cloud mirror (any device you paused on), and picks
+  // whichever is newest. If the cloud copy wins, mirror it into localStorage
+  // so the exam page's normal (synchronous) resume path picks it up unchanged.
   useEffect(() => {
-    const saved = readSession()
-    if (saved) {
+    fetchLatestSession().then(saved => {
+      if (!saved) return
+      writeSession(saved.meta, saved.state)
       const answered = saved.state.answers.filter(a => a.selectedIndices.length > 0 || a.skipped).length
       setResume({
         bankId: saved.meta.bankId, bankName: saved.meta.bankName, mode: saved.meta.mode,
         answered, total: saved.meta.questions.length,
       })
-    }
+    })
   }, [])
 
   function resumeExam() {
@@ -94,6 +98,7 @@ function ClassicDashboard() {
   function discardResume() {
     if (!confirm('Discard your in-progress exam? This cannot be undone.')) return
     clearSession()
+    clearCloudSession().catch(() => {})
     setResume(null)
   }
 

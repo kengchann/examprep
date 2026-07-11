@@ -420,6 +420,31 @@ ALTER TABLE questions ADD COLUMN IF NOT EXISTS match_buckets TEXT[];
 -- or -1 if the item is a distractor that should be left unassigned.
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS match_correct INTEGER[];
 
+-- ============================================
+-- v3.2 — AWS service classification (second, finer-grained layer on top of
+-- `topic`). Nullable: unclassified questions just have service = NULL and
+-- are simply excluded from "Study by Service" pickers. Existing topic-based
+-- mastery/weak-areas/exam behavior is completely unaffected.
+-- ============================================
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS service TEXT;
+CREATE INDEX IF NOT EXISTS idx_questions_service ON questions(service);
+
+-- ============================================
+-- v3.3 — Cross-device resume for a paused exam. One row per user; a newer
+-- push just overwrites it. `meta`/`state` mirror lib/session.ts's
+-- SessionMeta/SessionState shapes verbatim (jsonb, no schema of their own).
+-- ============================================
+CREATE TABLE IF NOT EXISTS active_session (
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+  meta JSONB NOT NULL,
+  state JSONB NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE active_session ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users manage own active session" ON active_session;
+CREATE POLICY "Users manage own active session" ON active_session
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
 -- 👑 MAKE YOURSELF SUPERADMIN — run this once with your login email:
 -- UPDATE public.profiles SET role = 'superadmin' WHERE email = 'kengchann@gmail.com';
 

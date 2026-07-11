@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useSettings, tapFeedback, readStored } from '@/lib/settings'
 import {
   SESSION_META_KEY, SESSION_STATE_KEY, readSession, clearSession,
+  pushCloudSession, clearCloudSession,
   type SessionMeta, type SessionState,
 } from '@/lib/session'
 import { readDeck } from '@/lib/deck'
@@ -418,12 +419,23 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
     if (submittedRef.current) return
     try { localStorage.setItem(SESSION_STATE_KEY, JSON.stringify(stateRef.current)) } catch {}
   }
+  // Local save + a cloud mirror, so pausing on this device lets you resume on
+  // another one. Only called at natural pause points (not the 5s tick) to
+  // avoid writing to the DB on every clock tick. Returns the cloud push's
+  // promise so callers that navigate right after (e.g. Save & Exit) can await
+  // it first — otherwise the route change can abort the in-flight request.
+  function saveAndSync() {
+    saveState()
+    if (submittedRef.current) return Promise.resolve()
+    const meta: SessionMeta = { bankId, bankName, mode, timeLimit, questions }
+    return pushCloudSession(meta, stateRef.current).catch(() => {})
+  }
   // Save on answer/position changes, every few seconds (for the clock), and when
   // the tab is hidden or closed (the most likely moment a connection drops).
   useEffect(() => { saveState() }, [answers, current])
   useEffect(() => {
     const iv = setInterval(saveState, 5000)
-    const onHide = () => saveState()
+    const onHide = () => saveAndSync()
     document.addEventListener('visibilitychange', onHide)
     window.addEventListener('pagehide', onHide)
     return () => {
@@ -615,6 +627,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
     const history = JSON.parse(localStorage.getItem('examprep_history') || '[]')
     localStorage.setItem('examprep_history', JSON.stringify([attempt, ...history].slice(0, 50)))
     clearSession()   // exam is finished — drop the saved in-progress session
+    clearCloudSession().catch(() => {})
 
     // Hand the (potentially large) results to the results page via sessionStorage
     // instead of the URL — a long URL triggers a 414 URI_TOO_LONG error.
@@ -683,13 +696,13 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
         <button onClick={() => setPaused(false)} className="w-full max-w-xs bg-white text-brand-600 font-bold py-4 rounded-2xl active:scale-95 transition-all mb-3">
           Resume Exam
         </button>
-        <button onClick={() => { saveState(); router.push('/dashboard') }} className="w-full max-w-xs border border-white/40 text-white font-medium py-3 rounded-2xl active:scale-95 mb-3">
+        <button onClick={async () => { await saveAndSync(); router.push('/dashboard') }} className="w-full max-w-xs border border-white/40 text-white font-medium py-3 rounded-2xl active:scale-95 mb-3">
           Save &amp; Exit
         </button>
         <button onClick={submitExam} className="w-full max-w-xs text-brand-200 text-sm py-2 active:scale-95">
           Submit &amp; See Results
         </button>
-        <p className="text-brand-200/70 text-xs mt-4 max-w-xs">Save &amp; Exit keeps your progress — resume anytime from the Home screen.</p>
+        <p className="text-brand-200/70 text-xs mt-4 max-w-xs">Save &amp; Exit keeps your progress — resume anytime from the Home screen, on any device.</p>
       </div>
     )
   }

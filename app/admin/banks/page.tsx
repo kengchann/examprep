@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import BottomNav from '@/components/BottomNav'
 import type { QuestionBank } from '@/lib/types'
+import { classifyService } from '@/lib/services'
 
 const BACKUP_VERSION = 1
 
@@ -95,7 +96,7 @@ export default function BanksPage() {
     setBusyBank(bank.id); setRestoreMsg('')
     const { data, error: err } = await supabase
       .from('questions')
-      .select('question_text, question_type, options, correct_indices, explanation, topic, image_url, order_index, match_items, match_buckets, match_correct')
+      .select('question_text, question_type, options, correct_indices, explanation, topic, service, image_url, order_index, match_items, match_buckets, match_correct')
       .eq('bank_id', bank.id)
       .order('order_index', { ascending: true })
     setBusyBank(null)
@@ -150,6 +151,7 @@ export default function BanksPage() {
         correct_indices: q.correct_indices ?? [],
         explanation: q.explanation ?? '',
         topic: q.topic ?? 'General',
+        service: q.service ?? classifyService(q.question_text ?? '', q.options ?? []),
         image_url: q.image_url ?? null,
         match_items: q.match_items ?? null,
         match_buckets: q.match_buckets ?? null,

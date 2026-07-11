@@ -6,6 +6,7 @@ import BottomNav from '@/components/BottomNav'
 import type { Question, QuestionBank, QuestionType } from '@/lib/types'
 import { parseQuestionCSV, CSV_TEMPLATE, type ParsedCSVRow } from '@/lib/csv'
 import { classifyTopic } from '@/lib/topics'
+import { classifyService } from '@/lib/services'
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 const MAX_OPTIONS = 8
@@ -73,6 +74,10 @@ export default function QuestionsPage() {
   const [tagProgress, setTagProgress] = useState(0)
   const [tagTotal, setTagTotal] = useState(0)
   const [tagSummary, setTagSummary] = useState<Record<string, number> | null>(null)
+  const [taggingServices, setTaggingServices] = useState(false)
+  const [serviceTagProgress, setServiceTagProgress] = useState(0)
+  const [serviceTagTotal, setServiceTagTotal] = useState(0)
+  const [serviceTagSummary, setServiceTagSummary] = useState<Record<string, number> | null>(null)
 
   // CSV import state
   const [importRows, setImportRows] = useState<ParsedCSVRow[] | null>(null)
@@ -334,6 +339,7 @@ export default function QuestionsPage() {
         ...typeSpecificFields(),
         explanation,
         topic: topic || 'General',
+        service: classifyService(questionText.trim(), buildActiveOptions()),
         image_url: imageUrl,
         order_index: nextIndex,
       })
@@ -506,6 +512,7 @@ export default function QuestionsPage() {
       correct_indices: it.correct_indices,
       explanation: it.explanation,
       topic: it.topic || 'General',
+      service: classifyService(it.question_text, it.question_type === 'truefalse' ? ['True', 'False'] : it.options),
       order_index: it.qNum != null ? it.qNum : nextIndex++,
     }))
 
@@ -560,6 +567,7 @@ export default function QuestionsPage() {
       correct_indices: r.correct_indices,
       explanation: r.explanation,
       topic: r.topic || 'General',
+      service: classifyService(r.question_text, r.options),
       order_index: nextIndex++,
     }))
 
@@ -677,6 +685,47 @@ export default function QuestionsPage() {
     loadQuestions(true)
   }
 
+  // Classify every question in the bank into a primary AWS service and save
+  // it. Same batching approach as autoTagTopics; unclassified questions
+  // (classifyService returns null) are skipped, leaving `service` as-is
+  // (usually NULL) rather than overwritten with a guess.
+  async function autoTagServices() {
+    if (!selectedBank) return
+    if (!confirm('Auto-tag every question in this bank with its primary AWS service?\nQuestions with no confident match are left unclassified.')) return
+    setTaggingServices(true); setServiceTagSummary(null); setServiceTagProgress(0)
+    const { data, error } = await supabase.from('questions')
+      .select('id, question_text, options').eq('bank_id', selectedBank)
+    if (error || !data) { alert('Could not load questions: ' + (error?.message || '')); setTaggingServices(false); return }
+
+    setServiceTagTotal(data.length)
+    const groups = new Map<string, string[]>()
+    let unclassified = 0
+    for (const q of data as { id: string; question_text: string; options: string[] }[]) {
+      const s = classifyService(q.question_text, q.options || [])
+      if (!s) { unclassified++; continue }
+      const arr = groups.get(s) || []
+      arr.push(q.id); groups.set(s, arr)
+    }
+
+    let done = unclassified
+    const summary: Record<string, number> = {}
+    for (const s of Array.from(groups.keys())) {
+      const ids = groups.get(s)!
+      summary[s] = ids.length
+      for (let i = 0; i < ids.length; i += 200) {
+        const chunk = ids.slice(i, i + 200)
+        const { error: uerr } = await supabase.from('questions').update({ service: s }).in('id', chunk)
+        if (uerr) { alert('Update failed: ' + uerr.message); setTaggingServices(false); return }
+        done += chunk.length
+        setServiceTagProgress(done)
+      }
+    }
+    if (unclassified > 0) summary['(unclassified)'] = unclassified
+    setServiceTagSummary(summary)
+    setTaggingServices(false)
+    loadQuestions(true)
+  }
+
   async function deleteFromScanner(id: string) {
     if (!confirm('Delete this question?')) return
     await supabase.from('questions').delete().eq('id', id)
@@ -765,6 +814,10 @@ export default function QuestionsPage() {
                     className="text-xs font-medium text-brand-600 active:scale-95 disabled:opacity-50">
                     {tagging ? `Tagging… ${tagProgress}/${tagTotal}` : '🏷️ Auto-tag topics'}
                   </button>
+                  <button onClick={autoTagServices} disabled={taggingServices}
+                    className="text-xs font-medium text-brand-600 active:scale-95 disabled:opacity-50">
+                    {taggingServices ? `Tagging… ${serviceTagProgress}/${serviceTagTotal}` : '🔧 Auto-tag services'}
+                  </button>
                 </div>
                 {tagSummary && (
                   <div className="card bg-brand-50 border-brand-100">
@@ -772,6 +825,16 @@ export default function QuestionsPage() {
                     <div className="flex flex-wrap gap-1.5">
                       {Object.entries(tagSummary).sort((a, b) => b[1] - a[1]).map(([t, n]) => (
                         <span key={t} className="tag bg-white text-gray-600 text-xs border border-gray-200">{t}: {n}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {serviceTagSummary && (
+                  <div className="card bg-brand-50 border-brand-100">
+                    <p className="text-xs font-semibold text-brand-700 mb-1">Services tagged ✓</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.entries(serviceTagSummary).sort((a, b) => b[1] - a[1]).map(([s, n]) => (
+                        <span key={s} className="tag bg-white text-gray-600 text-xs border border-gray-200">{s}: {n}</span>
                       ))}
                     </div>
                   </div>
