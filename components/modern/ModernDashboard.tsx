@@ -151,12 +151,6 @@ export default function ModernDashboard() {
       setUserName(user.user_metadata?.full_name?.split(' ')[0] || 'there')
       supabase.rpc('touch_last_active')
 
-      const saved = await fetchLatestSession()
-      if (saved) {
-        writeSession(saved.meta, saved.state)
-        setResume({ bankId: saved.meta.bankId, bankName: saved.meta.bankName, mode: saved.meta.mode })
-      }
-
       const [banksRes, countsRes, s, sp, topics] = await Promise.all([
         supabase.from('question_banks').select('*').order('created_at', { ascending: false }),
         supabase.from('questions').select('bank_id'),
@@ -175,6 +169,22 @@ export default function ModernDashboard() {
     load()
     const heartbeat = setInterval(() => supabase.rpc('touch_last_active'), 60000)
     return () => clearInterval(heartbeat)
+  }, [])
+
+  // Poll for a resumable session (this device or another) so one paused on
+  // your phone appears here within a few seconds — no manual refresh needed.
+  useEffect(() => {
+    let cancelled = false
+    async function checkResume() {
+      const saved = await fetchLatestSession()
+      if (cancelled) return
+      if (!saved) { setResume(null); return }
+      writeSession(saved.meta, saved.state)
+      setResume({ bankId: saved.meta.bankId, bankName: saved.meta.bankName, mode: saved.meta.mode })
+    }
+    checkResume()
+    const iv = setInterval(checkResume, 5000)
+    return () => { cancelled = true; clearInterval(iv) }
   }, [])
 
   async function startSprint() {

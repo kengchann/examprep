@@ -77,16 +77,24 @@ function ClassicDashboard() {
   // (localStorage) and the cloud mirror (any device you paused on), and picks
   // whichever is newest. If the cloud copy wins, mirror it into localStorage
   // so the exam page's normal (synchronous) resume path picks it up unchanged.
+  // Polled on an interval (like the presence heartbeat) so a session paused on
+  // another device shows up within a few seconds without a manual refresh.
   useEffect(() => {
-    fetchLatestSession().then(saved => {
-      if (!saved) return
+    let cancelled = false
+    async function checkResume() {
+      const saved = await fetchLatestSession()
+      if (cancelled) return
+      if (!saved) { setResume(null); return }
       writeSession(saved.meta, saved.state)
       const answered = saved.state.answers.filter(a => a.selectedIndices.length > 0 || a.skipped).length
       setResume({
         bankId: saved.meta.bankId, bankName: saved.meta.bankName, mode: saved.meta.mode,
         answered, total: saved.meta.questions.length,
       })
-    })
+    }
+    checkResume()
+    const iv = setInterval(checkResume, 5000)
+    return () => { cancelled = true; clearInterval(iv) }
   }, [])
 
   function resumeExam() {
