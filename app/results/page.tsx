@@ -3,7 +3,10 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { Suspense, useEffect, useState } from 'react'
 import { useSettings, tapFeedback } from '@/lib/settings'
 import { fetchBookmarkIds, addBookmark, removeBookmark } from '@/lib/bookmarks'
-import { fetchHighlightMap, saveHighlights } from '@/lib/highlights'
+import {
+  fetchHighlightMap, saveHighlights,
+  scopeOf, phrasesForScope, addHighlightEntry, removeHighlightEntry,
+} from '@/lib/highlights'
 import KeywordText from '@/components/KeywordText'
 import InsightCard, { type TutorContext } from '@/components/InsightCard'
 import { setDeck } from '@/lib/deck'
@@ -41,13 +44,14 @@ function ResultsContent() {
   // Personal text highlights, so review matches what you marked during the exam.
   const [highlights, setHighlights] = useState<Map<string, string[]>>(new Map())
   useEffect(() => { fetchHighlightMap().then(setHighlights) }, [])
-  function addHighlight(questionId: string, phrase: string) {
-    const next = Array.from(new Set([...(highlights.get(questionId) ?? []), phrase]))
+  // Scoped to the block of text the highlight was made in — see lib/highlights.
+  function addHighlight(questionId: string, phrase: string, blockText: string) {
+    const next = addHighlightEntry(highlights.get(questionId) ?? [], scopeOf(blockText), phrase)
     setHighlights(prev => new Map(prev).set(questionId, next))
     saveHighlights(questionId, next)
   }
-  function removeHighlight(questionId: string, phrase: string) {
-    const next = (highlights.get(questionId) ?? []).filter(p => p.toLowerCase() !== phrase.toLowerCase())
+  function removeHighlight(questionId: string, phrase: string, blockText: string) {
+    const next = removeHighlightEntry(highlights.get(questionId) ?? [], scopeOf(blockText), phrase)
     setHighlights(prev => new Map(prev).set(questionId, next))
     saveHighlights(questionId, next)
   }
@@ -279,9 +283,9 @@ function ResultsContent() {
                         <KeywordText
                           text={r.question_text}
                           enabled={settings.highlightKeywords}
-                          personal={highlights.get(r.questionId) ?? []}
-                          onAddHighlight={phrase => addHighlight(r.questionId, phrase)}
-                          onRemoveHighlight={phrase => removeHighlight(r.questionId, phrase)}
+                          personal={phrasesForScope(highlights.get(r.questionId) ?? [], scopeOf(r.question_text))}
+                          onAddHighlight={phrase => addHighlight(r.questionId, phrase, r.question_text)}
+                          onRemoveHighlight={phrase => removeHighlight(r.questionId, phrase, r.question_text)}
                         />
                       </div>
                       {r.image_url && (
@@ -320,9 +324,9 @@ function ResultsContent() {
                             <KeywordText
                               text={opt}
                               enabled={settings.highlightKeywords}
-                              personal={highlights.get(r.questionId) ?? []}
-                              onAddHighlight={phrase => addHighlight(r.questionId, phrase)}
-                              onRemoveHighlight={phrase => removeHighlight(r.questionId, phrase)}
+                              personal={phrasesForScope(highlights.get(r.questionId) ?? [], scopeOf(opt))}
+                              onAddHighlight={phrase => addHighlight(r.questionId, phrase, opt)}
+                              onRemoveHighlight={phrase => removeHighlight(r.questionId, phrase, opt)}
                             />
                           </span>
                           {r.correct_indices.includes(j) && <span className="flex-shrink-0">✓</span>}

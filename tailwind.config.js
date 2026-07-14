@@ -5,6 +5,10 @@ module.exports = {
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
+    // lib/ too: the trigger-keyword category colours (lib/keywords.ts) are
+    // declared as literal class strings there. Without this they are silently
+    // dropped from the build and the highlights render with no background.
+    './lib/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {

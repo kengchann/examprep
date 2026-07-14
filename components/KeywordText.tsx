@@ -1,9 +1,12 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { splitKeywords, splitByPhrases } from '@/lib/keywords'
+import {
+  splitKeywords, splitByPhrases, markClass,
+  CATEGORY_META, STRENGTH_META, type Trigger,
+} from '@/lib/keywords'
 
-type Seg = { text: string; kind: 'plain' | 'keyword' | 'personal'; hint?: string }
+type Seg = { text: string; kind: 'plain' | 'keyword' | 'personal'; trigger?: Trigger }
 
 function build(text: string, keywordEnabled: boolean, personal: string[]): Seg[] {
   const base = personal.length ? splitByPhrases(text, personal) : [{ text, matched: false }]
@@ -13,7 +16,7 @@ function build(text: string, keywordEnabled: boolean, personal: string[]): Seg[]
       segs.push({ text: part.text, kind: 'personal' })
     } else if (keywordEnabled) {
       for (const k of splitKeywords(part.text)) {
-        segs.push({ text: k.text, kind: k.hint ? 'keyword' : 'plain', hint: k.hint })
+        segs.push({ text: k.text, kind: k.trigger ? 'keyword' : 'plain', trigger: k.trigger })
       }
     } else {
       segs.push({ text: part.text, kind: 'plain' })
@@ -23,7 +26,10 @@ function build(text: string, keywordEnabled: boolean, personal: string[]): Seg[]
 }
 
 // Renders question text with two layers of highlighting:
-//  • keyword (amber) — built-in AWS trigger phrases, tap for a hint
+//  • keyword — built-in AWS trigger phrases, COLOURED BY CATEGORY (cost /
+//    security / ops …) and weighted by how decisive they are. Tap for a
+//    structured breakdown: what it signals, the services, and the trap it
+//    rules out.
 //  • personal (yellow) — phrases the student saved by selecting text; tap to remove
 // When `onAddHighlight` is provided, selecting text shows a "Highlight" bar.
 export default function KeywordText({
@@ -40,7 +46,7 @@ export default function KeywordText({
   onRemoveHighlight?: (phrase: string) => void
 }) {
   const ref = useRef<HTMLSpanElement>(null)
-  const [hint, setHint] = useState<{ phrase: string; hint: string } | null>(null)
+  const [hint, setHint] = useState<Trigger | null>(null)
   const [pending, setPending] = useState('')
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -84,12 +90,14 @@ export default function KeywordText({
               </span>
             )
           }
-          if (s.kind === 'keyword') {
+          if (s.kind === 'keyword' && s.trigger) {
+            const t = s.trigger
             return (
               <span
                 key={i}
-                onClick={e => { e.stopPropagation(); setHint({ phrase: s.text, hint: s.hint! }) }}
-                className="cursor-pointer rounded bg-amber-100 text-amber-900 px-0.5 underline decoration-dotted decoration-amber-400 underline-offset-2"
+                onClick={e => { e.stopPropagation(); setHint(t) }}
+                title={`${CATEGORY_META[t.category].label} · ${STRENGTH_META[t.strength].label}`}
+                className={markClass(t)}
               >
                 {s.text}
               </span>
@@ -99,13 +107,40 @@ export default function KeywordText({
         })}
       </span>
 
-      {/* Keyword hint popover */}
+      {/* Keyword hint popover — what it signals, what it points to, and the
+          distractor it rules out (the part students actually miss). */}
       {mounted && hint && createPortal(
         <div className="fixed inset-x-0 bottom-0 z-[60] p-4" onClick={() => setHint(null)}>
-          <div className="mx-auto max-w-md bg-gray-900 text-white rounded-2xl px-4 py-3 shadow-xl" onClick={e => e.stopPropagation()}>
-            <p className="text-xs uppercase tracking-wide text-amber-300 font-semibold">💡 “{hint.phrase}”</p>
+          <div className="mx-auto max-w-md bg-gray-900 text-white rounded-2xl px-4 py-3.5 shadow-xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${CATEGORY_META[hint.category].chip}`}>
+                {CATEGORY_META[hint.category].label}
+              </span>
+              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-gray-700 text-gray-200">
+                {STRENGTH_META[hint.strength].label}
+              </span>
+            </div>
+
+            <p className="text-base font-semibold leading-snug">“{hint.phrase}”</p>
             <p className="text-sm mt-1 leading-relaxed text-gray-100">{hint.hint}</p>
-            <button onClick={() => setHint(null)} className="text-xs text-gray-400 mt-2">Tap anywhere to dismiss</button>
+
+            {hint.services && (
+              <p className="text-sm mt-2 leading-relaxed">
+                <span className="text-gray-400">Points to: </span>
+                <span className="text-emerald-300 font-medium">{hint.services}</span>
+              </p>
+            )}
+
+            {hint.trap && (
+              <p className="text-sm mt-2 leading-relaxed bg-rose-950/60 border border-rose-900 rounded-lg px-2.5 py-2">
+                <span className="text-rose-300 font-semibold">Trap: </span>
+                <span className="text-rose-100">{hint.trap}</span>
+              </p>
+            )}
+
+            <p className="text-[11px] text-gray-500 mt-2.5">
+              {STRENGTH_META[hint.strength].blurb} · Tap anywhere to dismiss
+            </p>
           </div>
         </div>,
         document.body

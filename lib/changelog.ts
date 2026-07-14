@@ -1,10 +1,30 @@
 // Bump alongside new changelog entries below.
-export const APP_VERSION = '1.13.1'
+export const APP_VERSION = '1.14.0'
 
 // Maintained by hand — add a new entry whenever a feature ships. Newest first.
 export type ChangeEntry = { date: string; title: string; items: string[] }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-07-15',
+    title: 'Trigger keywords rebuilt — colour-coded, ranked, with traps',
+    items: [
+      'Trigger phrases are now colour-coded by category (Cost, Ops overhead, Availability, Performance, Security, Integration, Storage, Data, Networking, Migration) — so you can see at a glance what a question is really testing, instead of every highlight looking the same.',
+      'Triggers are ranked by how much they decide the answer: decisive ones are bold with a solid underline, supporting ones dotted, context ones plain.',
+      'Tap any highlight for a full breakdown: what it signals, the services it points to, and — most importantly — the trap it rules out (e.g. "least operational overhead" rules out any answer with EC2 instances you patch yourself).',
+      'The dictionary grew from about 60 phrases to nearly 200.',
+      'The Trigger Trainer now drills the category, the services, and the trap too. A legend lives in the exam Instructions panel.',
+    ],
+  },
+  {
+    date: '2026-07-14 (4)',
+    title: 'Highlights stay where you put them',
+    items: [
+      'Highlighting a word in one answer no longer highlights the same word in the question and every other answer. Each highlight now belongs to the specific block of text you made it in, and still survives answer shuffling.',
+      'Built-in keyword highlights (amber) are unchanged — those deliberately mark every occurrence of an exam trigger word. Use 🔆 to turn them off.',
+      'Highlights you saved before this update are kept as-is.',
+    ],
+  },
   {
     date: '2026-07-14 (3)',
     title: 'Highlighting works in Simulator',

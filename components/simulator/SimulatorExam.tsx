@@ -2,6 +2,8 @@
 import { useState, type ReactNode } from 'react'
 import KeywordText from '@/components/KeywordText'
 import DesignSwitch from '@/components/DesignSwitch'
+import KeywordLegend from '@/components/KeywordLegend'
+import { scopeOf, phrasesForScope } from '@/lib/highlights'
 import type { Question, ExamAnswer } from '@/lib/types'
 
 // "Simulator" design — a desktop exam-simulator skin for the exam screen only
@@ -41,8 +43,8 @@ type Props = {
   keywordOn: boolean
   setKeywordOn: (fn: (v: boolean) => boolean) => void
   highlights: Map<string, string[]>
-  addHighlight: (phrase: string) => void
-  removeHighlight: (phrase: string) => void
+  addHighlight: (phrase: string, blockText: string) => void
+  removeHighlight: (phrase: string, blockText: string) => void
   bookmarks: Set<string>
   toggleStar: () => void
   toggleFlag: () => void
@@ -115,12 +117,15 @@ export default function SimulatorExam(p: Props) {
       : { background: 'transparent', borderColor: 'transparent' }
   }
 
-  const keywordProps = {
+  // Highlight props for one block of text. Scoped per block, so highlighting a
+  // word in an option doesn't light it up in the question and every other option.
+  const entries = p.highlights.get(q.id) ?? []
+  const keywordProps = (blockText: string) => ({
     enabled: p.keywordOn,
-    personal: p.keywordOn ? (p.highlights.get(q.id) ?? []) : [],
-    onAddHighlight: p.keywordOn ? p.addHighlight : undefined,
-    onRemoveHighlight: p.keywordOn ? p.removeHighlight : undefined,
-  }
+    personal: p.keywordOn ? phrasesForScope(entries, scopeOf(blockText)) : [],
+    onAddHighlight: p.keywordOn ? ((ph: string) => p.addHighlight(ph, blockText)) : undefined,
+    onRemoveHighlight: p.keywordOn ? ((ph: string) => p.removeHighlight(ph, blockText)) : undefined,
+  })
 
   return (
     <div className="sim-skin min-h-screen flex flex-col bg-[#f1f1f1]" style={{ fontFamily: FONT }}>
@@ -172,7 +177,7 @@ export default function SimulatorExam(p: Props) {
       <div className="flex-1 bg-white">
         <div className="max-w-5xl mx-auto px-4 py-4" style={{ fontSize: `${zoom}%` }}>
           <div className="text-[13px] text-[#1a1a1a] leading-[1.5] whitespace-pre-wrap break-words">
-            <KeywordText text={q.question_text} {...keywordProps} />
+            <KeywordText text={q.question_text} {...keywordProps(q.question_text)} />
           </div>
 
           {p.isMultiple && (
@@ -221,7 +226,7 @@ export default function SimulatorExam(p: Props) {
                       {OPTION_LABELS[i] ?? i}.
                     </span>
                     <span className="text-[13px] text-[#1a1a1a] leading-[1.5] whitespace-pre-wrap break-words select-text">
-                      <KeywordText text={opt} {...keywordProps} />
+                      <KeywordText text={opt} {...keywordProps(opt)} />
                     </span>
                   </button>
                 )
@@ -365,6 +370,10 @@ export default function SimulatorExam(p: Props) {
                 : <p>Answers are revealed after you finish — this is a timed practice exam.</p>}
               <p><b>Save Session</b> stores your progress and exits; you can resume on any device.</p>
               <p><b>End Exam</b> submits and scores everything answered so far.</p>
+              <div className="pt-2 mt-2 border-t border-[#e0e0e0]">
+                <p className="font-bold mb-1.5">🔆 Trigger highlights</p>
+                <KeywordLegend />
+              </div>
             </div>
           </div>
         </div>

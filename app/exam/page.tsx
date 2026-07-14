@@ -12,7 +12,10 @@ import { readDeck } from '@/lib/deck'
 import { applyResults as applySrs } from '@/lib/srs'
 import { fetchBookmarkIds, addBookmark, removeBookmark } from '@/lib/bookmarks'
 import { addMistake } from '@/lib/mistakes'
-import { fetchHighlightMap, saveHighlights } from '@/lib/highlights'
+import {
+  fetchHighlightMap, saveHighlights,
+  scopeOf, phrasesForScope, addHighlightEntry, removeHighlightEntry,
+} from '@/lib/highlights'
 import KeywordText from '@/components/KeywordText'
 import InsightCard, { type TutorContext } from '@/components/InsightCard'
 import SimulatorExam from '@/components/simulator/SimulatorExam'
@@ -380,15 +383,18 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
   // Load this user's personal text highlights for these questions.
   useEffect(() => { fetchHighlightMap().then(setHighlights) }, [])
 
-  function addHighlight(phrase: string) {
+  // Highlights are scoped to the block of text they were made in (the question,
+  // or one specific option) so highlighting a word in option A doesn't light up
+  // the same word in the question and every other option.
+  function addHighlight(phrase: string, blockText: string) {
     const id = q.id
-    const next = Array.from(new Set([...(highlights.get(id) ?? []), phrase]))
+    const next = addHighlightEntry(highlights.get(id) ?? [], scopeOf(blockText), phrase)
     setHighlights(prev => new Map(prev).set(id, next))
     saveHighlights(id, next)
   }
-  function removeHighlight(phrase: string) {
+  function removeHighlight(phrase: string, blockText: string) {
     const id = q.id
-    const next = (highlights.get(id) ?? []).filter(p => p.toLowerCase() !== phrase.toLowerCase())
+    const next = removeHighlightEntry(highlights.get(id) ?? [], scopeOf(blockText), phrase)
     setHighlights(prev => new Map(prev).set(id, next))
     saveHighlights(id, next)
   }
@@ -842,9 +848,9 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
             <KeywordText
               text={q.question_text}
               enabled={keywordOn}
-              personal={keywordOn ? (highlights.get(q.id) ?? []) : []}
-              onAddHighlight={keywordOn ? addHighlight : undefined}
-              onRemoveHighlight={keywordOn ? removeHighlight : undefined}
+              personal={keywordOn ? phrasesForScope(highlights.get(q.id) ?? [], scopeOf(q.question_text)) : []}
+              onAddHighlight={keywordOn ? (p => addHighlight(p, q.question_text)) : undefined}
+              onRemoveHighlight={keywordOn ? (p => removeHighlight(p, q.question_text)) : undefined}
             />
           </div>
           {q.image_url && (
@@ -876,9 +882,9 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
                   <KeywordText
                     text={opt}
                     enabled={keywordOn}
-                    personal={keywordOn ? (highlights.get(q.id) ?? []) : []}
-                    onAddHighlight={keywordOn ? addHighlight : undefined}
-                    onRemoveHighlight={keywordOn ? removeHighlight : undefined}
+                    personal={keywordOn ? phrasesForScope(highlights.get(q.id) ?? [], scopeOf(opt)) : []}
+                    onAddHighlight={keywordOn ? (p => addHighlight(p, opt)) : undefined}
+                    onRemoveHighlight={keywordOn ? (p => removeHighlight(p, opt)) : undefined}
                   />
                 </span>
                 {confirmed && q.correct_indices.includes(i) && <span className="ml-auto text-green-600 flex-shrink-0">✓</span>}

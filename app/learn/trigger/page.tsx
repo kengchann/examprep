@@ -1,7 +1,7 @@
 'use client'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { TRIGGERS } from '@/lib/keywords'
+import { TRIGGERS, CATEGORY_META, STRENGTH_META } from '@/lib/keywords'
 
 const SESSION = 12
 
@@ -62,9 +62,31 @@ export default function TriggerTrainerPage() {
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">When you see this trigger…</p>
           <p className="text-2xl font-bold text-gray-900 leading-snug">“{card.phrase}”</p>
           {revealed && (
-            <div className="mt-6 bg-brand-50 border border-brand-100 rounded-2xl px-4 py-3">
-              <p className="text-xs font-semibold text-brand-600 mb-0.5">→ think</p>
-              <p className="text-sm text-brand-800 leading-relaxed">{card.hint}</p>
+            <div className="mt-6 w-full space-y-2 text-left">
+              <div className="flex items-center gap-2 flex-wrap justify-center">
+                <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${CATEGORY_META[card.category].chip}`}>
+                  {CATEGORY_META[card.category].label}
+                </span>
+                <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                  {STRENGTH_META[card.strength].label}
+                </span>
+              </div>
+              <div className="bg-brand-50 border border-brand-100 rounded-2xl px-4 py-3">
+                <p className="text-xs font-semibold text-brand-600 mb-0.5">→ think</p>
+                <p className="text-sm text-brand-800 leading-relaxed">{card.hint}</p>
+                {card.services && (
+                  <p className="text-sm text-brand-800 leading-relaxed mt-1.5">
+                    <span className="text-brand-500">Points to: </span>
+                    <span className="font-medium">{card.services}</span>
+                  </p>
+                )}
+              </div>
+              {card.trap && (
+                <div className="bg-red-50 border border-red-100 rounded-2xl px-4 py-3">
+                  <p className="text-xs font-semibold text-red-600 mb-0.5">⚠ Trap</p>
+                  <p className="text-sm text-red-800 leading-relaxed">{card.trap}</p>
+                </div>
+              )}
             </div>
           )}
         </div>
