@@ -1,10 +1,19 @@
 // Bump alongside new changelog entries below.
-export const APP_VERSION = '1.12.0'
+export const APP_VERSION = '1.13.0'
 
 // Maintained by hand — add a new entry whenever a feature ships. Newest first.
 export type ChangeEntry = { date: string; title: string; items: string[] }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-07-14 (2)',
+    title: 'Simulator is now the default — and switchable mid-exam',
+    items: [
+      'Simulator is now the default design. Anyone who explicitly picked Classic or Modern keeps their choice.',
+      'You can switch design without leaving a question — use Design in the exam header (🎨 in Classic/Modern). Your place, answers, timer, and any revealed answer are all kept.',
+      'Learning mode now always shows you the answer before moving on: pressing Next on a question reveals the correct answer and explanation, and a second Next advances. Scoring is unchanged — a skipped question still counts as wrong.',
+    ],
+  },
   {
     date: '2026-07-14',
     title: 'Simulator design for the exam screen',

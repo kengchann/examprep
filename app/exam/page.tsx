@@ -16,6 +16,7 @@ import { fetchHighlightMap, saveHighlights } from '@/lib/highlights'
 import KeywordText from '@/components/KeywordText'
 import InsightCard, { type TutorContext } from '@/components/InsightCard'
 import SimulatorExam from '@/components/simulator/SimulatorExam'
+import DesignSwitch from '@/components/DesignSwitch'
 import { useDesign } from '@/lib/design'
 import type { Question, ExamMode, ExamAnswer, Confidence } from '@/lib/types'
 
@@ -825,6 +826,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
               {q.question_type === 'multiple' ? 'Multiple answer' : q.question_type === 'truefalse' ? 'True / False' : q.question_type === 'match' ? 'Match' : 'Single answer'}
             </span>
             <div className="ml-auto flex items-center gap-3">
+              <DesignSwitch />
               <button onClick={() => setKeywordOn(v => !v)} className={`text-lg active:scale-95 ${keywordOn ? '' : 'opacity-30 grayscale'}`} title="Toggle highlights (keywords + your own)">
                 🔆
               </button>

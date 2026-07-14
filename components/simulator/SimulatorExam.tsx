@@ -1,6 +1,7 @@
 'use client'
 import { useState, type ReactNode } from 'react'
 import KeywordText from '@/components/KeywordText'
+import DesignSwitch from '@/components/DesignSwitch'
 import type { Question, ExamAnswer } from '@/lib/types'
 
 // "Simulator" design — a desktop exam-simulator skin for the exam screen only
@@ -96,6 +97,9 @@ export default function SimulatorExam(p: Props) {
     if (target !== -1) p.goTo(target)
   }
 
+  // An option is shown as correct only once the answer has been revealed.
+  const isRight = (i: number) => revealed && q.correct_indices.includes(i)
+
   // Row background for an option, mirroring the runner's own reveal rules.
   function rowStyle(i: number): { background: string; borderColor: string } {
     const sel = answer.selectedIndices.includes(i)
@@ -150,6 +154,7 @@ export default function SimulatorExam(p: Props) {
           <button onClick={p.toggleStar} className="text-[15px] leading-none" title="Bookmark">
             {p.bookmarks.has(q.id) ? '⭐' : '☆'}
           </button>
+          <DesignSwitch compact />
           <button onClick={() => setShowInstructions(true)}
             className="text-[13px] text-[#15599c] underline hover:text-[#0d3f74]">
             Instructions
@@ -187,14 +192,23 @@ export default function SimulatorExam(p: Props) {
                   <button key={i} onClick={() => p.toggleSelect(i)}
                     style={{ background: style.background, borderColor: style.borderColor }}
                     className="w-full text-left flex items-start gap-2 px-2 py-1.5 border transition-colors hover:bg-[#f2f7fc]">
-                    <span className={`mt-[3px] w-3.5 h-3.5 rounded-full border shrink-0 inline-flex items-center justify-center
-                      ${revealed && q.correct_indices.includes(i)
+                    {/* Radio for single-answer, checkbox for "choose two/three" — the
+                        shape is how a student knows how many answers are wanted. */}
+                    <span className={`mt-[3px] w-3.5 h-3.5 border shrink-0 inline-flex items-center justify-center
+                      ${p.isMultiple ? 'rounded-[2px]' : 'rounded-full'}
+                      ${isRight(i)
                         ? 'border-[#3d9140] bg-white'
                         : sel ? 'border-[#2c5f9e] bg-white' : 'border-[#8a8a8a] bg-white'}`}>
-                      {(sel || (revealed && q.correct_indices.includes(i))) && (
-                        <span className={`w-1.5 h-1.5 rounded-full ${
-                          revealed && q.correct_indices.includes(i) ? 'bg-[#3d9140]' : 'bg-[#2c5f9e]'
-                        }`} />
+                      {(sel || isRight(i)) && (
+                        p.isMultiple ? (
+                          <span className={`text-[10px] leading-none font-bold ${
+                            isRight(i) ? 'text-[#3d9140]' : 'text-[#2c5f9e]'
+                          }`}>✓</span>
+                        ) : (
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            isRight(i) ? 'bg-[#3d9140]' : 'bg-[#2c5f9e]'
+                          }`} />
+                        )
                       )}
                     </span>
                     <span className="text-[13px] text-[#1a1a1a] leading-[1.5] shrink-0 font-normal">

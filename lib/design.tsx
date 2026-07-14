@@ -25,13 +25,14 @@ export const ACCENTS: { id: Accent; label: string; color: string }[] = [
   { id: 'amber', label: 'Amber', color: '#D97706' },
 ]
 
-// Modern is the default; users who explicitly picked Classic or Simulator keep it.
+// Simulator is the default (it only changes the exam screen — every other page
+// still renders Modern). Anyone who explicitly picked a design keeps it.
 export function readDesign(): Design {
   if (typeof window === 'undefined') return 'classic'
   try {
     const d = localStorage.getItem(KEY)
-    return d === 'classic' || d === 'simulator' ? d : 'modern'
-  } catch { return 'modern' }
+    return d === 'classic' || d === 'modern' || d === 'simulator' ? d : 'simulator'
+  } catch { return 'simulator' }
 }
 
 function readAccent(): Accent {
