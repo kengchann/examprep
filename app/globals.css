@@ -232,3 +232,14 @@ html.modern[data-accent="amber"]   { --m-primary: 217 119 6;   --m-primary-hover
 .modern.dark ::-webkit-scrollbar-track { background: rgb(var(--m-bg)); }
 .modern.dark ::-webkit-scrollbar-thumb { background: #2a3450; border-radius: 8px; border: 2px solid rgb(var(--m-bg)); }
 .modern.dark ::-webkit-scrollbar-thumb:hover { background: #39456a; }
+
+/* ── Simulator skin ───────────────────────────────────────────────────────
+   The exam-simulator design is a deliberately LIGHT desktop look and must
+   render identically whether the user's theme is light or dark. The .dark /
+   .modern.dark layers above rewrite neutral utilities by class name
+   (.dark .bg-white -> slate), which would wash the skin out, so re-assert the
+   light values inside .sim-skin with a higher-specificity selector. Scoped to
+   the exam screen only — it never leaks into Classic/Modern pages. */
+.dark .sim-skin .bg-white,
+.modern.dark .sim-skin .bg-white { background-color: #ffffff; }
+.dark .sim-skin, .modern.dark .sim-skin { color: #1a1a1a; }

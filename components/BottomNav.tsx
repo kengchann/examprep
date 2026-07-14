@@ -26,7 +26,7 @@ export default function BottomNav() {
 
   // Modern design: every page gets the shared modern shell (desktop sidebar +
   // mobile bottom bar) instead of the classic tab bar.
-  if (design === 'modern') return <ModernNav isAdmin={isAdmin} />
+  if (design !== 'classic') return <ModernNav isAdmin={isAdmin} />
   // Admins already have many tabs (Banks/Questions/Students); they reach Learn via
   // the Home screen card instead, to keep the bar from overflowing.
   const tabs = isAdmin

@@ -30,7 +30,8 @@ export default function Dashboard() {
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
   if (!mounted) return <div className="min-h-screen bg-gray-50" />
-  return design === 'modern' ? <ModernDashboard /> : <ClassicDashboard />
+  // 'simulator' only reskins the exam screen — every other page uses Modern.
+  return design === 'classic' ? <ClassicDashboard /> : <ModernDashboard />
 }
 
 function ClassicDashboard() {

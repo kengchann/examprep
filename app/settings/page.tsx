@@ -58,9 +58,10 @@ export default function SettingsPage() {
                 options={[
                   { val: 'classic', label: '◱ Classic' },
                   { val: 'modern', label: '✨ Modern' },
+                  { val: 'simulator', label: '🖥 Simulator' },
                 ]}
               />
-              <p className="text-xs text-gray-400 mt-1">Modern is a premium redesign (follows your light/dark theme). Classic is the original look. Switch anytime — nothing else changes.</p>
+              <p className="text-xs text-gray-400 mt-1">Modern is a premium redesign (follows your light/dark theme). Classic is the original look. Simulator gives the exam screen a desktop exam-simulator look — the rest of the app stays Modern. Switch anytime — nothing else changes.</p>
             </div>
             {design === 'modern' && (
               <div>

@@ -1,10 +1,19 @@
 // Bump alongside new changelog entries below.
-export const APP_VERSION = '1.11.0'
+export const APP_VERSION = '1.12.0'
 
 // Maintained by hand — add a new entry whenever a feature ships. Newest first.
 export type ChangeEntry = { date: string; title: string; items: string[] }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-07-14',
+    title: 'Simulator design for the exam screen',
+    items: [
+      'New "Simulator" design — pick it in Settings → Appearance → Design. The exam screen takes on a classic desktop exam-simulator look: Mark, question counter, lettered options, inline Answer + Explanation panel, and a Previous / Next / Review / Show Answer / Show List / Save Session / End Exam toolbar.',
+      'Includes a zoom control for the question text, and adapts to phone screens.',
+      'Only the exam screen changes — the rest of the app stays on Modern, and scoring, mastery, and reveal rules are exactly the same.',
+    ],
+  },
   {
     date: '2026-07-12 (2)',
     title: 'Resume your exam on any device',

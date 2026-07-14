@@ -25,3 +25,6 @@ npm-debug.log*
 # exam source files (large, not part of the app)
 *.vce
 *.pdf
+
+# Claude Code: local machine settings (keep launch config, ignore local perms)
+.claude/settings.local.json

@@ -6,8 +6,12 @@ import { createContext, useContext, useEffect, useState } from 'react'
 // Stored in localStorage (ui-design / ui-accent) and applied as classes /
 // data-accent on <html> so a single CSS token layer reskins every page at
 // once. Instant switch, no reload.
+//
+// 'simulator' reskins the EXAM SCREEN ONLY, to look like a desktop exam
+// simulator. Every other page falls back to Modern, so it carries the
+// 'modern' class on <html> just like Modern does.
 
-export type Design = 'classic' | 'modern'
+export type Design = 'classic' | 'modern' | 'simulator'
 export type Accent = 'violet' | 'blue' | 'emerald' | 'rose' | 'amber'
 
 const KEY = 'ui-design'
@@ -21,10 +25,13 @@ export const ACCENTS: { id: Accent; label: string; color: string }[] = [
   { id: 'amber', label: 'Amber', color: '#D97706' },
 ]
 
-// Modern is the default; users who explicitly picked Classic keep it.
+// Modern is the default; users who explicitly picked Classic or Simulator keep it.
 export function readDesign(): Design {
   if (typeof window === 'undefined') return 'classic'
-  try { return localStorage.getItem(KEY) === 'classic' ? 'classic' : 'modern' } catch { return 'modern' }
+  try {
+    const d = localStorage.getItem(KEY)
+    return d === 'classic' || d === 'simulator' ? d : 'modern'
+  } catch { return 'modern' }
 }
 
 function readAccent(): Accent {
@@ -54,14 +61,14 @@ export function DesignProvider({ children }: { children: React.ReactNode }) {
     const a = readAccent()
     setDesignState(d)
     setAccentState(a)
-    document.documentElement.classList.toggle('modern', d === 'modern')
+    document.documentElement.classList.toggle('modern', d !== 'classic')
     if (a !== 'violet') document.documentElement.dataset.accent = a
   }, [])
 
   function setDesign(d: Design) {
     setDesignState(d)
     try { localStorage.setItem(KEY, d) } catch {}
-    document.documentElement.classList.toggle('modern', d === 'modern')
+    document.documentElement.classList.toggle('modern', d !== 'classic')
   }
 
   function setAccent(a: Accent) {

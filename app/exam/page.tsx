@@ -15,6 +15,8 @@ import { addMistake } from '@/lib/mistakes'
 import { fetchHighlightMap, saveHighlights } from '@/lib/highlights'
 import KeywordText from '@/components/KeywordText'
 import InsightCard, { type TutorContext } from '@/components/InsightCard'
+import SimulatorExam from '@/components/simulator/SimulatorExam'
+import { useDesign } from '@/lib/design'
 import type { Question, ExamMode, ExamAnswer, Confidence } from '@/lib/types'
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
@@ -343,6 +345,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
   const router = useRouter()
   const supabase = createClient()
   const { settings } = useSettings()
+  const { design } = useDesign()
   const [current, setCurrent] = useState(resumeState?.current ?? 0)
   const [answers, setAnswers] = useState<ExamAnswer[]>(() =>
     resumeState?.answers ??
@@ -704,6 +707,49 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
         </button>
         <p className="text-brand-200/70 text-xs mt-4 max-w-xs">Save &amp; Exit keeps your progress — resume anytime from the Home screen, on any device.</p>
       </div>
+    )
+  }
+
+  // Simulator design — same logic, desktop exam-simulator skin.
+  if (design === 'simulator') {
+    return (
+      <>
+        <SimulatorExam
+          questions={questions} answers={answers} current={current} q={q} answer={answer}
+          isLearning={isLearning} isMultiple={isMultiple} confirmed={confirmed} submitting={submitting}
+          bankName={bankName}
+          secondsLeft={secondsLeft} elapsed={elapsed} hideTimer={!!settings.hideTimer} formatTime={formatTime}
+          keywordOn={keywordOn} highlights={highlights}
+          addHighlight={addHighlight} removeHighlight={removeHighlight}
+          bookmarks={bookmarks} toggleStar={toggleStar} toggleFlag={toggleFlag}
+          toggleSelect={toggleSelect} confirmAnswer={confirmAnswer} showAnswer={showAnswer}
+          next={next} goPrev={goPrev} goTo={goTo} submitExam={submitExam}
+          onSaveExit={async () => { await saveAndSync(); router.push('/dashboard') }}
+          hasResponse={hasResponse}
+          onDiscuss={() => setTutor({
+            question_id: q.id,
+            question_text: q.question_text,
+            options: q.options,
+            correct_indices: q.correct_indices,
+            selected_indices: answer.selectedIndices,
+            topic: q.topic,
+            explanation: q.explanation,
+          })}
+          matchSlot={q.question_type === 'match' ? (
+            <MatchQuestion
+              q={q}
+              assignment={answer.matchAssignment ?? new Array((q.match_items ?? []).length).fill(-1)}
+              confirmed={confirmed}
+              onChange={next => setAnswers(prev => {
+                const updated = [...prev]
+                updated[current] = { ...updated[current], matchAssignment: next }
+                return updated
+              })}
+            />
+          ) : null}
+        />
+        {tutor && <InsightCard context={tutor} onClose={() => setTutor(null)} />}
+      </>
     )
   }
 
