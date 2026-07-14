@@ -39,6 +39,7 @@ type Props = {
   hideTimer: boolean
   formatTime: (s: number) => string
   keywordOn: boolean
+  setKeywordOn: (fn: (v: boolean) => boolean) => void
   highlights: Map<string, string[]>
   addHighlight: (phrase: string) => void
   removeHighlight: (phrase: string) => void
@@ -151,6 +152,11 @@ export default function SimulatorExam(p: Props) {
               {p.secondsLeft !== null ? p.formatTime(p.secondsLeft) : p.formatTime(p.elapsed)}
             </span>
           )}
+          <button onClick={() => p.setKeywordOn(v => !v)}
+            title="Toggle highlights (keywords + your own)"
+            className={`text-[15px] leading-none ${p.keywordOn ? '' : 'opacity-30 grayscale'}`}>
+            🔆
+          </button>
           <button onClick={p.toggleStar} className="text-[15px] leading-none" title="Bookmark">
             {p.bookmarks.has(q.id) ? '⭐' : '☆'}
           </button>

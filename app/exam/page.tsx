@@ -737,7 +737,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
           isLearning={isLearning} isMultiple={isMultiple} confirmed={confirmed} submitting={submitting}
           bankName={bankName}
           secondsLeft={secondsLeft} elapsed={elapsed} hideTimer={!!settings.hideTimer} formatTime={formatTime}
-          keywordOn={keywordOn} highlights={highlights}
+          keywordOn={keywordOn} setKeywordOn={setKeywordOn} highlights={highlights}
           addHighlight={addHighlight} removeHighlight={removeHighlight}
           bookmarks={bookmarks} toggleStar={toggleStar} toggleFlag={toggleFlag}
           toggleSelect={toggleSelect} confirmAnswer={confirmAnswer} showAnswer={showAnswer}

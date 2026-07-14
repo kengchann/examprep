@@ -1,10 +1,17 @@
 // Bump alongside new changelog entries below.
-export const APP_VERSION = '1.13.0'
+export const APP_VERSION = '1.13.1'
 
 // Maintained by hand — add a new entry whenever a feature ships. Newest first.
 export type ChangeEntry = { date: string; title: string; items: string[] }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-07-14 (3)',
+    title: 'Highlighting works in Simulator',
+    items: [
+      'The 🔆 highlight toggle was missing from the Simulator exam screen, so keyword and personal highlights could not be turned on there. It is now in the Simulator header, next to the bookmark.',
+    ],
+  },
   {
     date: '2026-07-14 (2)',
     title: 'Simulator is now the default — and switchable mid-exam',
