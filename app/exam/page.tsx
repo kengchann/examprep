@@ -556,6 +556,23 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
   }
 
   function next() {
+    // Learning mode exists to show you the answer, so never move past a question
+    // without revealing it: the first Next reveals (marking it skipped if you
+    // left it blank, exactly as before), a second Next moves on. Scoring is
+    // unchanged — a skipped question still counts wrong and still lands in My
+    // Mistakes; only the moment of reveal differs. Practice mode is untouched.
+    if (isLearning && !confirmed) {
+      const spent = Math.round((Date.now() - questionStartRef.current) / 1000)
+      setAnswers(prev => {
+        const updated = [...prev]
+        const cur = { ...updated[current], timeSpent: spent }
+        if (!hasResponse(cur)) cur.skipped = true
+        updated[current] = cur
+        return updated
+      })
+      setConfirmed(true)
+      return
+    }
     setAnswers(prev => {
       const updated = [...prev]
       if (!hasResponse(updated[current])) updated[current] = { ...updated[current], skipped: true }
@@ -943,7 +960,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
             )}
             {!confirmed && (
               <button onClick={next} className="flex-1 text-gray-400 text-sm py-2 active:scale-95">
-                Skip question
+                {isLearning ? 'Skip & show answer' : 'Skip question'}
               </button>
             )}
           </div>
