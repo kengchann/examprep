@@ -55,7 +55,7 @@ function ExamSetup({ questions, mode, onStart }: {
   const [from, setFrom] = useState('1')
   const [to, setTo] = useState(String(Math.min(10, questions.length)))
   const [timeLimit, setTimeLimit] = useState<number | null>(90)
-  const [shuffle, setShuffle] = useState(false)
+  const [order, setOrder] = useState<'normal' | 'reverse' | 'shuffle'>('normal')
   const [shuffleAnswers, setShuffleAnswers] = useState(settings.shuffleOptions)
   const [highlight, setHighlight] = useState(settings.highlightKeywords)
   const [hasLimit, setHasLimit] = useState(mode === 'practice')
@@ -68,10 +68,34 @@ function ExamSetup({ questions, mode, onStart }: {
 
   function start() {
     const slice = questions.slice(fromN - 1, toN)
-    const ordered = shuffle ? [...slice].sort(() => Math.random() - 0.5) : slice
+    const ordered =
+      order === 'shuffle' ? [...slice].sort(() => Math.random() - 0.5) :
+      order === 'reverse' ? [...slice].reverse() :
+      slice
     const final = shuffleAnswers ? ordered.map(shuffleOptions) : ordered
-    onStart(final, { from: fromN, to: toN, timeLimit: hasLimit ? timeLimit : null, shuffle, highlight })
+    onStart(final, { from: fromN, to: toN, timeLimit: hasLimit ? timeLimit : null, shuffle: order === 'shuffle', highlight })
   }
+
+  // Shared 3-way order picker. "Reverse" walks the selected range last→first
+  // (e.g. 946→1); "Shuffle" randomises. Both respect the From/To range.
+  const orderControl = (
+    <div>
+      <p className="text-sm text-gray-700 mb-1.5">Question order</p>
+      <div className="flex bg-gray-100 rounded-xl p-1">
+        {([
+          ['normal', 'In order'],
+          ['reverse', 'Reverse'],
+          ['shuffle', 'Shuffle'],
+        ] as const).map(([val, label]) => (
+          <button key={val} type="button" onClick={() => setOrder(val)}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+              order === val ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
 
   // Reusable checkboxes shared by the Practice and Custom setup screens.
   const shuffleAnswersCheckbox = (
@@ -119,10 +143,7 @@ function ExamSetup({ questions, mode, onStart }: {
                 onChange={e => setTimeLimit(parseInt(e.target.value))} className="w-full" />
               <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>10 min</span><span>180 min</span></div>
             </div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={shuffle} onChange={e => setShuffle(e.target.checked)} className="w-4 h-4 accent-brand-600" />
-              <span className="text-sm text-gray-700">Shuffle question order</span>
-            </label>
+            {orderControl}
             {shuffleAnswersCheckbox}
             {highlightCheckbox}
           </div>
@@ -177,10 +198,7 @@ function ExamSetup({ questions, mode, onStart }: {
               )}
               {!hasLimit && <p className="text-xs text-gray-400">No time limit — study at your own pace</p>}
             </div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={shuffle} onChange={e => setShuffle(e.target.checked)} className="w-4 h-4 accent-brand-600" />
-              <span className="text-sm text-gray-700">Shuffle question order</span>
-            </label>
+            {orderControl}
             {shuffleAnswersCheckbox}
             {highlightCheckbox}
           </div>
@@ -218,10 +236,7 @@ function ExamSetup({ questions, mode, onStart }: {
               </div>
               <p className="text-xs text-gray-400 mt-1">{total} question{total !== 1 ? 's' : ''} · {questions.length} total</p>
             </div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={shuffle} onChange={e => setShuffle(e.target.checked)} className="w-4 h-4 accent-brand-600" />
-              <span className="text-sm text-gray-700">Shuffle question order</span>
-            </label>
+            {orderControl}
             {shuffleAnswersCheckbox}
             {highlightCheckbox}
           </div>

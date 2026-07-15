@@ -1,10 +1,18 @@
 // Bump alongside new changelog entries below.
-export const APP_VERSION = '1.14.0'
+export const APP_VERSION = '1.15.0'
 
 // Maintained by hand — add a new entry whenever a feature ships. Newest first.
 export type ChangeEntry = { date: string; title: string; items: string[] }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-07-15 (2)',
+    title: 'Reverse question order',
+    items: [
+      'Exam setup now has a Question order picker: In order, Reverse, or Shuffle. Reverse walks your selected range from last to first (e.g. 946→1, or 7→3 if you picked that range).',
+      'Available in Practice, Learning, and Custom modes. The old "Shuffle question order" checkbox is now the Shuffle option in this picker.',
+    ],
+  },
   {
     date: '2026-07-15',
     title: 'Trigger keywords rebuilt — colour-coded, ranked, with traps',
