@@ -1,10 +1,19 @@
 // Bump alongside new changelog entries below.
-export const APP_VERSION = '1.15.1'
+export const APP_VERSION = '1.16.0'
 
 // Maintained by hand — add a new entry whenever a feature ships. Newest first.
 export type ChangeEntry = { date: string; title: string; items: string[] }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-07-15 (4)',
+    title: 'Smarter service classification — far fewer unclassified',
+    items: [
+      'Auto-tag services now assigns a service to nearly every question. On the SAA-C03 946 bank, unclassified dropped from 335 (35%) to 13 (1%).',
+      'When several services score close together, the question is tagged with the one it is really about (e.g. the database, not the EC2 host or the KMS key it mentions in passing) instead of being left unclassified.',
+      'Questions with only a weak, single mention still stay unclassified rather than being guessed. Re-run Auto-tag services on a bank to apply the new tagging.',
+    ],
+  },
   {
     date: '2026-07-15 (3)',
     title: 'Unclassified card in Study by Service',

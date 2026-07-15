@@ -108,15 +108,44 @@ const SERVICE_RE: { service: AwsService; re: RegExp }[] = AWS_SERVICES.map(servi
   re: new RegExp('\\b(' + SERVICE_KEYWORDS[service].map(k => escapeRegExp(k.trim())).join('|') + ')', 'gi'),
 }))
 
-// Minimum score margin the top service must have over the runner-up before
-// we commit to it. Below this, the question likely references multiple
-// services (Lambda + DynamoDB + IAM, say) without a clear single focus —
-// per spec, we leave `service` empty rather than guess.
-const MIN_MARGIN = 2
+// A question needs at least this raw score for its top service before we
+// commit. A lone weak mention (score 1) stays unclassified rather than guessed.
+const MIN_SCORE = 2
 
-// Pick the single AWS service a question is primarily testing, or null if
-// no service is named or several are too close to call. Question text
-// counts double over answer options (mirrors classifyTopic).
+// When the top services are within this many points of each other, the raw
+// keyword count can't tell them apart, so we break the tie by primacy (below)
+// instead of by score — e.g. a question that mentions RDS and, in passing, an
+// EC2 host and a KMS key is really an RDS question.
+const TIE_BAND = 1
+
+// Primacy: how likely a service is to be the SUBJECT a question is testing,
+// rather than a supporting actor. Lower = preferred when scores are close.
+// Subject services (databases, storage, app-compute, integration, analytics,
+// delivery) win over hosts (EC2/ELB/Auto Scaling), which win over cross-cutting
+// concerns (IAM, KMS, VPC, monitoring, org/security tooling) that show up in
+// almost every scenario. Anything unlisted is treated as cross-cutting.
+const SUBJECT_SERVICES: AwsService[] = [
+  'DynamoDB', 'Aurora', 'Amazon RDS', 'ElastiCache', 'DocumentDB', 'Neptune', 'Redshift',
+  'Amazon S3', 'EFS', 'FSx', 'EBS', 'Storage Gateway', 'Snow Family', 'AWS Backup', 'DataSync',
+  'Lambda', 'ECS', 'EKS', 'Fargate', 'Elastic Beanstalk', 'Lightsail',
+  'SQS', 'SNS', 'EventBridge', 'Step Functions', 'Amazon MQ',
+  'Kinesis', 'Athena', 'AWS Glue', 'EMR', 'QuickSight', 'OpenSearch', 'MSK',
+  'CloudFront', 'API Gateway', 'Route 53', 'Global Accelerator',
+]
+const HOST_SERVICES: AwsService[] = ['EC2', 'Auto Scaling', 'Elastic Load Balancing']
+
+function primacy(service: AwsService): number {
+  const s = SUBJECT_SERVICES.indexOf(service)
+  if (s >= 0) return s                 // 0..N — most subject-like first
+  const h = HOST_SERVICES.indexOf(service)
+  if (h >= 0) return 100 + h           // hosts sit below every subject
+  return 200                           // cross-cutting concerns last
+}
+
+// Pick the single AWS service a question is primarily testing, or null if no
+// service is confidently named. Question text counts double over answer
+// options (mirrors classifyTopic). Among services within TIE_BAND of the top
+// score, the most subject-like one wins.
 export function classifyService(questionText: string, options: string[] = []): AwsService | null {
   const q = ' ' + (questionText || '').toLowerCase() + ' '
   const opt = ' ' + options.join(' ').toLowerCase() + ' '
@@ -133,10 +162,12 @@ export function classifyService(questionText: string, options: string[] = []): A
   if (scores.length === 0) return null
 
   scores.sort((a, b) => b.score - a.score)
-  const best = scores[0]
-  const second = scores[1]
-  if (second && best.score - second.score < MIN_MARGIN) return null
-  return best.service
+  const top = scores[0].score
+  if (top < MIN_SCORE) return null
+
+  const contenders = scores.filter(s => top - s.score <= TIE_BAND)
+  contenders.sort((a, b) => primacy(a.service) - primacy(b.service))
+  return contenders[0].service
 }
 
 // ---- "Study by Service" data access (mirrors mistakes.ts / bookmarks.ts) ----
