@@ -1,10 +1,18 @@
 // Bump alongside new changelog entries below.
-export const APP_VERSION = '1.15.0'
+export const APP_VERSION = '1.15.1'
 
 // Maintained by hand — add a new entry whenever a feature ships. Newest first.
 export type ChangeEntry = { date: string; title: string; items: string[] }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-07-15 (3)',
+    title: 'Unclassified card in Study by Service',
+    items: [
+      'Study by Service now shows an "Unclassified" card (pinned last) for questions that have no assigned AWS service — the same group Admin shows under "(unclassified)". Every question in the bank is reachable again.',
+      'Its count is computed from the same aggregation as the other service cards, so it always matches Admin.',
+    ],
+  },
   {
     date: '2026-07-15 (2)',
     title: 'Reverse question order',

@@ -143,24 +143,38 @@ export function classifyService(questionText: string, options: string[] = []): A
 
 export type ServiceCount = { service: string; count: number }
 
-// How many classified questions exist per service, most-populous first.
-// RLS still applies (trial users only see their allotted first-N questions
-// per bank), so trial students naturally see smaller counts here too.
+// Virtual "service" bucket for questions with no assigned AWS service (service
+// is null/empty) — the same set Admin groups under "(unclassified)". Not a real
+// service; just a grouping so every question stays reachable in Study by
+// Service. A real service can never be named this (see AWS_SERVICES).
+export const UNCLASSIFIED = 'Unclassified'
+
+// How many questions exist per service, most-populous first, with the
+// Unclassified bucket pinned last. One query + one aggregation over the whole
+// bank, so these counts always match Admin's. RLS still applies (trial users
+// only see their allotted first-N questions per bank).
 export async function fetchServiceCounts(): Promise<ServiceCount[]> {
   const supabase = createClient()
-  const { data } = await supabase.from('questions').select('service').not('service', 'is', null)
+  const { data } = await supabase.from('questions').select('service')
   const counts = new Map<string, number>()
+  let unclassified = 0
   for (const r of (data ?? []) as { service: string | null }[]) {
-    if (!r.service) continue
+    if (!r.service) { unclassified++; continue }
     counts.set(r.service, (counts.get(r.service) || 0) + 1)
   }
-  return Array.from(counts, ([service, count]) => ({ service, count })).sort((a, b) => b.count - a.count)
+  const out = Array.from(counts, ([service, count]) => ({ service, count })).sort((a, b) => b.count - a.count)
+  if (unclassified > 0) out.push({ service: UNCLASSIFIED, count: unclassified })
+  return out
 }
 
-// Full question rows for one AWS service, shuffled for variety.
+// Full question rows for one AWS service, shuffled for variety. The
+// UNCLASSIFIED sentinel returns every question with no service (null/empty).
 export async function fetchQuestionsByService(service: string): Promise<Question[]> {
   const supabase = createClient()
-  const { data } = await supabase.from('questions').select('*').eq('service', service)
+  const query = supabase.from('questions').select('*')
+  const { data } = service === UNCLASSIFIED
+    ? await query.or('service.is.null,service.eq.')
+    : await query.eq('service', service)
   const qs = (data ?? []) as Question[]
   return qs.sort(() => Math.random() - 0.5)
 }
