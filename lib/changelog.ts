@@ -1,10 +1,19 @@
 // Bump alongside new changelog entries below.
-export const APP_VERSION = '1.16.0'
+export const APP_VERSION = '1.17.0'
 
 // Maintained by hand — add a new entry whenever a feature ships. Newest first.
 export type ChangeEntry = { date: string; title: string; items: string[] }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-07-16',
+    title: 'Filter and edit service tags, plus fewer unclassified',
+    items: [
+      'Admin → Questions has a service filter next to the search box — narrow the list to any one AWS service, or to Unclassified.',
+      'The question editor now has an AWS service field: Auto-detect, a specific service to override, or Unclassified to clear it.',
+      '“Which service should you use?” questions are now classified from their correct answer when the wording alone is inconclusive, so the SAA-C03 946 bank drops from 13 unclassified to 6. Re-run Auto-tag services to apply.',
+    ],
+  },
   {
     date: '2026-07-15 (4)',
     title: 'Smarter service classification — far fewer unclassified',

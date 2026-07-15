@@ -6,7 +6,10 @@ import BottomNav from '@/components/BottomNav'
 import type { Question, QuestionBank, QuestionType } from '@/lib/types'
 import { parseQuestionCSV, CSV_TEMPLATE, type ParsedCSVRow } from '@/lib/csv'
 import { classifyTopic } from '@/lib/topics'
-import { classifyService } from '@/lib/services'
+import { classifyService, AWS_SERVICES, UNCLASSIFIED } from '@/lib/services'
+
+// Sentinel form value: keep the auto-detected service instead of forcing one.
+const SERVICE_AUTO = '__auto__'
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 const MAX_OPTIONS = 8
@@ -64,6 +67,11 @@ export default function QuestionsPage() {
   const [search, setSearch] = useState('')
   const [activeSearch, setActiveSearch] = useState('')
 
+  // Service filter ('' = all; UNCLASSIFIED = null-service). bankServices lists
+  // the services actually present in the selected bank, for the dropdown.
+  const [serviceFilter, setServiceFilter] = useState('')
+  const [bankServices, setBankServices] = useState<{ service: string; count: number }[]>([])
+
   // Duplicate handling
   const [duplicateOf, setDuplicateOf] = useState<{ order_index: number; question_text: string } | null>(null)
   const [dupGroups, setDupGroups] = useState<DupGroup[] | null>(null)
@@ -102,6 +110,10 @@ export default function QuestionsPage() {
   const [correctIndices, setCorrectIndices] = useState<number[]>([])
   const [explanation, setExplanation] = useState('')
   const [topic, setTopic] = useState('')
+  // Form service tag: SERVICE_AUTO = auto-detect, '' = Unclassified, else a
+  // specific AWS service. New questions default to auto; editing loads the
+  // stored value so it can be overridden by hand.
+  const [service, setService] = useState<string>(SERVICE_AUTO)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
 
@@ -147,7 +159,26 @@ export default function QuestionsPage() {
     return () => clearTimeout(t)
   }, [search])
 
-  useEffect(() => { if (selectedBank) loadQuestions(true) }, [selectedBank, activeSearch])
+  useEffect(() => { if (selectedBank) loadQuestions(true) }, [selectedBank, activeSearch, serviceFilter])
+
+  // Services present in the selected bank, for the filter dropdown.
+  async function loadBankServices() {
+    if (!selectedBank) { setBankServices([]); return }
+    const { data } = await supabase.from('questions').select('service').eq('bank_id', selectedBank)
+    const counts = new Map<string, number>()
+    let unclassified = 0
+    for (const r of (data ?? []) as { service: string | null }[]) {
+      if (!r.service) unclassified++
+      else counts.set(r.service, (counts.get(r.service) || 0) + 1)
+    }
+    const list = Array.from(counts, ([service, count]) => ({ service, count })).sort((a, b) => b.count - a.count)
+    if (unclassified > 0) list.push({ service: UNCLASSIFIED, count: unclassified })
+    setBankServices(list)
+  }
+
+  // Reset the active filter whenever the bank changes so we never filter by a
+  // service the new bank doesn't have, then load that bank's service list.
+  useEffect(() => { setServiceFilter(''); loadBankServices() }, [selectedBank])
 
   // reset=true reloads the first page; reset=false appends the next page
   async function loadQuestions(reset: boolean) {
@@ -162,6 +193,8 @@ export default function QuestionsPage() {
     const numMatch = trimmed.match(/^q?\s*(\d+)$/i)   // "Q99", "q 99", or "99" → search by number
     if (numMatch) query = query.eq('order_index', parseInt(numMatch[1], 10))
     else if (trimmed) query = query.ilike('question_text', `%${trimmed}%`)
+    if (serviceFilter === UNCLASSIFIED) query = query.or('service.is.null,service.eq.')
+    else if (serviceFilter) query = query.eq('service', serviceFilter)
     const { data, count } = await query.order('order_index', { ascending: true }).range(from, to)
     const rows = (data as Question[]) || []
     setQuestions(prev => (reset ? rows : [...prev, ...rows]))
@@ -195,7 +228,7 @@ export default function QuestionsPage() {
 
   function resetForm() {
     setQuestionText(''); setOptions(['', '', '', '']); setCorrectIndices([])
-    setExplanation(''); setTopic(''); setQType('single'); setError('')
+    setExplanation(''); setTopic(''); setService(SERVICE_AUTO); setQType('single'); setError('')
     setImageUrl(null); setEditingQuestion(null); setExtractNote('')
     setMatchBuckets(['', '']); setMatchItems(['', '']); setMatchCorrect([-1, -1])
   }
@@ -208,6 +241,7 @@ export default function QuestionsPage() {
     setCorrectIndices([...q.correct_indices])
     setExplanation(q.explanation ?? '')
     setTopic(q.topic ?? '')
+    setService(q.service ?? '')   // '' = Unclassified; edit loads the stored tag
     setImageUrl(q.image_url ?? null)
     if (q.question_type === 'match') {
       setMatchBuckets(q.match_buckets && q.match_buckets.length ? [...q.match_buckets] : ['', ''])
@@ -315,6 +349,11 @@ export default function QuestionsPage() {
   async function doSave() {
     setSaving(true); setError(''); setDuplicateOf(null)
 
+    // SERVICE_AUTO → auto-detect; '' → Unclassified (null); else the chosen service.
+    const resolvedService = service === SERVICE_AUTO
+      ? classifyService(questionText.trim(), buildActiveOptions(), correctIndices)
+      : (service || null)
+
     if (editingQuestion) {
       const { error: err } = await supabase.from('questions').update({
         question_text: questionText.trim(),
@@ -322,11 +361,12 @@ export default function QuestionsPage() {
         ...typeSpecificFields(),
         explanation,
         topic: topic || 'General',
+        service: resolvedService,
         image_url: imageUrl,
       }).eq('id', editingQuestion.id)
 
       if (err) { setError(err.message) }
-      else { resetForm(); setShowForm(false); loadQuestions(true) }
+      else { resetForm(); setShowForm(false); loadQuestions(true); loadBankServices() }
     } else {
       const { data: existing } = await supabase.from('questions')
         .select('order_index').eq('bank_id', selectedBank).order('order_index', { ascending: false }).limit(1)
@@ -339,7 +379,7 @@ export default function QuestionsPage() {
         ...typeSpecificFields(),
         explanation,
         topic: topic || 'General',
-        service: classifyService(questionText.trim(), buildActiveOptions()),
+        service: resolvedService,
         image_url: imageUrl,
         order_index: nextIndex,
       })
@@ -348,7 +388,7 @@ export default function QuestionsPage() {
       else {
         await supabase.rpc('increment_question_count', { bank_id_param: selectedBank })
         setBanks(prev => prev.map(b => b.id === selectedBank ? { ...b, question_count: b.question_count + 1 } : b))
-        resetForm(); setShowForm(false); loadQuestions(true)
+        resetForm(); setShowForm(false); loadQuestions(true); loadBankServices()
       }
     }
     setSaving(false)
@@ -512,7 +552,7 @@ export default function QuestionsPage() {
       correct_indices: it.correct_indices,
       explanation: it.explanation,
       topic: it.topic || 'General',
-      service: classifyService(it.question_text, it.question_type === 'truefalse' ? ['True', 'False'] : it.options),
+      service: classifyService(it.question_text, it.question_type === 'truefalse' ? ['True', 'False'] : it.options, it.correct_indices),
       order_index: it.qNum != null ? it.qNum : nextIndex++,
     }))
 
@@ -567,7 +607,7 @@ export default function QuestionsPage() {
       correct_indices: r.correct_indices,
       explanation: r.explanation,
       topic: r.topic || 'General',
-      service: classifyService(r.question_text, r.options),
+      service: classifyService(r.question_text, r.options, r.correct_indices),
       order_index: nextIndex++,
     }))
 
@@ -694,14 +734,14 @@ export default function QuestionsPage() {
     if (!confirm('Auto-tag every question in this bank with its primary AWS service?\nQuestions with no confident match are left unclassified.')) return
     setTaggingServices(true); setServiceTagSummary(null); setServiceTagProgress(0)
     const { data, error } = await supabase.from('questions')
-      .select('id, question_text, options').eq('bank_id', selectedBank)
+      .select('id, question_text, options, correct_indices').eq('bank_id', selectedBank)
     if (error || !data) { alert('Could not load questions: ' + (error?.message || '')); setTaggingServices(false); return }
 
     setServiceTagTotal(data.length)
     const groups = new Map<string, string[]>()
     let unclassified = 0
-    for (const q of data as { id: string; question_text: string; options: string[] }[]) {
-      const s = classifyService(q.question_text, q.options || [])
+    for (const q of data as { id: string; question_text: string; options: string[]; correct_indices: number[] }[]) {
+      const s = classifyService(q.question_text, q.options || [], q.correct_indices || [])
       if (!s) { unclassified++; continue }
       const arr = groups.get(s) || []
       arr.push(q.id); groups.set(s, arr)
@@ -722,6 +762,7 @@ export default function QuestionsPage() {
     }
     if (unclassified > 0) summary['(unclassified)'] = unclassified
     setServiceTagSummary(summary)
+    loadBankServices()
     setTaggingServices(false)
     loadQuestions(true)
   }
@@ -805,6 +846,15 @@ export default function QuestionsPage() {
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg leading-none">×</button>
                   )}
                 </div>
+                {bankServices.length > 0 && (
+                  <select className="input-field text-sm" value={serviceFilter}
+                    onChange={e => setServiceFilter(e.target.value)}>
+                    <option value="">All services</option>
+                    {bankServices.map(s => (
+                      <option key={s.service} value={s.service}>{s.service} ({s.count})</option>
+                    ))}
+                  </select>
+                )}
                 <div className="flex items-center gap-4">
                   <button onClick={findDuplicates} disabled={scanningDups}
                     className="text-xs font-medium text-brand-600 active:scale-95 disabled:opacity-50">
@@ -1008,6 +1058,19 @@ export default function QuestionsPage() {
                   <label className="text-sm font-medium text-gray-600 block mb-1">Topic / Domain (optional)</label>
                   <input className="input-field" placeholder="e.g. Networking, Security, OSI Model"
                     value={topic} onChange={e => setTopic(e.target.value)} />
+                </div>
+
+                {/* AWS service tag */}
+                <div>
+                  <label className="text-sm font-medium text-gray-600 block mb-1">AWS service (Study by Service)</label>
+                  <select className="input-field" value={service} onChange={e => setService(e.target.value)}>
+                    <option value={SERVICE_AUTO}>Auto-detect</option>
+                    <option value="">Unclassified</option>
+                    {AWS_SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Auto-detect classifies from the text on save. Pick a service to override, or Unclassified to clear it.
+                  </p>
                 </div>
 
                 {/* Explanation */}

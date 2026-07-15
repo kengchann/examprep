@@ -142,32 +142,54 @@ function primacy(service: AwsService): number {
   return 200                           // cross-cutting concerns last
 }
 
-// Pick the single AWS service a question is primarily testing, or null if no
-// service is confidently named. Question text counts double over answer
-// options (mirrors classifyTopic). Among services within TIE_BAND of the top
-// score, the most subject-like one wins.
-export function classifyService(questionText: string, options: string[] = []): AwsService | null {
-  const q = ' ' + (questionText || '').toLowerCase() + ' '
-  const opt = ' ' + options.join(' ').toLowerCase() + ' '
-
+// Score every service against a body of text; return the winner (subject-most
+// among services within TIE_BAND of the top), or null if nothing scores high
+// enough. `weightFirst` counts double — for the question stem that's the stem
+// itself; for the correct-answer fallback there is no distinction so it's ''.
+function pickService(weightFirst: string, rest: string): AwsService | null {
+  const a = ' ' + weightFirst.toLowerCase() + ' '
+  const b = ' ' + rest.toLowerCase() + ' '
   const scores: { service: AwsService; score: number }[] = []
   for (const { service, re } of SERVICE_RE) {
     re.lastIndex = 0
-    const qHits = (q.match(re) || []).length
+    const aHits = (a.match(re) || []).length
     re.lastIndex = 0
-    const optHits = (opt.match(re) || []).length
-    const score = qHits * 2 + optHits
+    const bHits = (b.match(re) || []).length
+    const score = aHits * 2 + bHits
     if (score > 0) scores.push({ service, score })
   }
   if (scores.length === 0) return null
-
-  scores.sort((a, b) => b.score - a.score)
+  scores.sort((x, y) => y.score - x.score)
   const top = scores[0].score
   if (top < MIN_SCORE) return null
-
   const contenders = scores.filter(s => top - s.score <= TIE_BAND)
-  contenders.sort((a, b) => primacy(a.service) - primacy(b.service))
+  contenders.sort((x, y) => primacy(x.service) - primacy(y.service))
   return contenders[0].service
+}
+
+// Pick the single AWS service a question is primarily testing, or null if no
+// service is confidently named. Question text counts double over answer
+// options (mirrors classifyTopic).
+//
+// Fallback: when the stem + options are inconclusive but the CORRECT option is
+// known (correctIndices), classify the correct option's text on its own — for
+// "which service should you use?" questions the right answer literally names
+// the service, which is a stronger signal than counting the whole stem. This
+// only runs when the primary pass returns null, so nothing already classified
+// changes.
+export function classifyService(
+  questionText: string,
+  options: string[] = [],
+  correctIndices?: number[],
+): AwsService | null {
+  const primary = pickService(questionText || '', options.join(' '))
+  if (primary) return primary
+
+  if (correctIndices && correctIndices.length > 0) {
+    const correctText = options.filter((_, i) => correctIndices.includes(i)).join('  ')
+    if (correctText) return pickService(correctText, '')
+  }
+  return null
 }
 
 // ---- "Study by Service" data access (mirrors mistakes.ts / bookmarks.ts) ----

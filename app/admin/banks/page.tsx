@@ -151,7 +151,7 @@ export default function BanksPage() {
         correct_indices: q.correct_indices ?? [],
         explanation: q.explanation ?? '',
         topic: q.topic ?? 'General',
-        service: q.service ?? classifyService(q.question_text ?? '', q.options ?? []),
+        service: q.service ?? classifyService(q.question_text ?? '', q.options ?? [], q.correct_indices ?? []),
         image_url: q.image_url ?? null,
         match_items: q.match_items ?? null,
         match_buckets: q.match_buckets ?? null,
