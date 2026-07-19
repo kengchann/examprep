@@ -1,10 +1,18 @@
 // Bump alongside new changelog entries below.
-export const APP_VERSION = '1.17.0'
+export const APP_VERSION = '1.18.0'
 
 // Maintained by hand — add a new entry whenever a feature ships. Newest first.
 export type ChangeEntry = { date: string; title: string; items: string[] }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-07-16 (2)',
+    title: 'Multi-answer-only exams',
+    items: [
+      'Exam setup has a Question type picker: All types, or Multi-answer only (the "choose two/three" questions). Works in Practice, Learning, and Custom modes, and combines with the range and order options.',
+      'Handy for drilling the multi-select questions, which are often the trickiest.',
+    ],
+  },
   {
     date: '2026-07-16',
     title: 'Filter and edit service tags, plus fewer unclassified',

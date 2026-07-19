@@ -56,18 +56,33 @@ function ExamSetup({ questions, mode, onStart }: {
   const [to, setTo] = useState(String(Math.min(10, questions.length)))
   const [timeLimit, setTimeLimit] = useState<number | null>(90)
   const [order, setOrder] = useState<'normal' | 'reverse' | 'shuffle'>('normal')
+  const [typeFilter, setTypeFilter] = useState<'all' | 'multiple'>('all')
   const [shuffleAnswers, setShuffleAnswers] = useState(settings.shuffleOptions)
   const [highlight, setHighlight] = useState(settings.highlightKeywords)
   const [hasLimit, setHasLimit] = useState(mode === 'practice')
 
+  // The question pool the range applies to. With the "Multi-answer" filter on,
+  // only "choose two/three" questions are included; From/To then means the Nth
+  // multi-answer question, not order_index.
+  const pool = typeFilter === 'multiple'
+    ? questions.filter(q => q.question_type === 'multiple')
+    : questions
+
+  // When the filter changes the pool size, snap the range back to a sane
+  // default so a stale "To" doesn't clamp confusingly against a smaller pool.
+  useEffect(() => {
+    setFrom('1')
+    setTo(String(Math.min(10, pool.length)))
+  }, [typeFilter])
+
   // Inputs hold raw strings so they can be cleared and retyped freely. We clamp
   // to a valid range only for computing totals / starting (and on blur).
-  const fromN = Math.min(questions.length, Math.max(1, parseInt(from) || 1))
-  const toN = Math.min(questions.length, Math.max(fromN, parseInt(to) || fromN))
-  const total = Math.max(0, toN - fromN + 1)
+  const fromN = Math.min(pool.length, Math.max(1, parseInt(from) || 1))
+  const toN = Math.min(pool.length, Math.max(fromN, parseInt(to) || fromN))
+  const total = pool.length === 0 ? 0 : Math.max(0, toN - fromN + 1)
 
   function start() {
-    const slice = questions.slice(fromN - 1, toN)
+    const slice = pool.slice(fromN - 1, toN)
     const ordered =
       order === 'shuffle' ? [...slice].sort(() => Math.random() - 0.5) :
       order === 'reverse' ? [...slice].reverse() :
@@ -75,6 +90,32 @@ function ExamSetup({ questions, mode, onStart }: {
     const final = shuffleAnswers ? ordered.map(shuffleOptions) : ordered
     onStart(final, { from: fromN, to: toN, timeLimit: hasLimit ? timeLimit : null, shuffle: order === 'shuffle', highlight })
   }
+
+  // Question-type filter — "Multi-answer" restricts to "choose two/three"
+  // questions (single/truefalse/match excluded). Shared across all three modes.
+  const typeControl = (
+    <div>
+      <p className="text-sm text-gray-700 mb-1.5">Question type</p>
+      <div className="flex bg-gray-100 rounded-xl p-1">
+        {([
+          ['all', 'All types'],
+          ['multiple', 'Multi-answer'],
+        ] as const).map(([val, label]) => (
+          <button key={val} type="button" onClick={() => setTypeFilter(val)}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+              typeFilter === val ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {typeFilter === 'multiple' && pool.length === 0 && (
+        <p className="text-xs text-amber-600 mt-1">This bank has no multiple-answer questions.</p>
+      )}
+    </div>
+  )
+
+  // Adjective for the count line, so a filtered pool reads "N multi-answer questions".
+  const adj = typeFilter === 'multiple' ? 'multi-answer ' : ''
 
   // Shared 3-way order picker. "Reverse" walks the selected range last→first
   // (e.g. 946→1); "Shuffle" randomises. Both respect the From/To range.
@@ -135,7 +176,7 @@ function ExamSetup({ questions, mode, onStart }: {
                     value={to} onChange={e => setTo(e.target.value)} onBlur={() => setTo(String(toN))} />
                 </div>
               </div>
-              <p className="text-xs text-gray-400 mt-1">{total} question{total !== 1 ? 's' : ''} selected · {questions.length} total</p>
+              <p className="text-xs text-gray-400 mt-1">{total} {adj}question{total !== 1 ? 's' : ''} selected · {questions.length} total</p>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-600 block mb-2">Time limit: {timeLimit} minutes</label>
@@ -143,6 +184,7 @@ function ExamSetup({ questions, mode, onStart }: {
                 onChange={e => setTimeLimit(parseInt(e.target.value))} className="w-full" />
               <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>10 min</span><span>180 min</span></div>
             </div>
+            {typeControl}
             {orderControl}
             {shuffleAnswersCheckbox}
             {highlightCheckbox}
@@ -179,7 +221,7 @@ function ExamSetup({ questions, mode, onStart }: {
                     value={to} onChange={e => setTo(e.target.value)} onBlur={() => setTo(String(toN))} />
                 </div>
               </div>
-              <p className="text-xs text-gray-400 mt-1">{total} question{total !== 1 ? 's' : ''} · {questions.length} total</p>
+              <p className="text-xs text-gray-400 mt-1">{total} {adj}question{total !== 1 ? 's' : ''} · {questions.length} total</p>
             </div>
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -198,6 +240,7 @@ function ExamSetup({ questions, mode, onStart }: {
               )}
               {!hasLimit && <p className="text-xs text-gray-400">No time limit — study at your own pace</p>}
             </div>
+            {typeControl}
             {orderControl}
             {shuffleAnswersCheckbox}
             {highlightCheckbox}
@@ -234,8 +277,9 @@ function ExamSetup({ questions, mode, onStart }: {
                     value={to} onChange={e => setTo(e.target.value)} onBlur={() => setTo(String(toN))} />
                 </div>
               </div>
-              <p className="text-xs text-gray-400 mt-1">{total} question{total !== 1 ? 's' : ''} · {questions.length} total</p>
+              <p className="text-xs text-gray-400 mt-1">{total} {adj}question{total !== 1 ? 's' : ''} · {questions.length} total</p>
             </div>
+            {typeControl}
             {orderControl}
             {shuffleAnswersCheckbox}
             {highlightCheckbox}
