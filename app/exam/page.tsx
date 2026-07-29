@@ -9,6 +9,8 @@ import {
   type SessionMeta, type SessionState,
 } from '@/lib/session'
 import { readDeck } from '@/lib/deck'
+import { fetchBankQuestions } from '@/lib/bankCache'
+import { invalidateAttempts } from '@/lib/attemptsCache'
 import { applyResults as applySrs } from '@/lib/srs'
 import { fetchBookmarkIds, addBookmark, removeBookmark } from '@/lib/bookmarks'
 import { addMistake } from '@/lib/mistakes'
@@ -730,6 +732,7 @@ function ExamRunner({ questions, mode, bankId, bankName, timeLimit, resumeState,
           details: results,   // full per-question results so it can be reviewed later
         })
         if (error) console.error('Could not save attempt:', error.message)
+        else invalidateAttempts()   // stats/decks must reflect this new attempt
       }
     } catch (e) {
       console.error('Could not save attempt:', e)
@@ -1131,9 +1134,9 @@ function ExamContent() {
         return
       }
 
-      const { data } = await supabase.from('questions').select('*').eq('bank_id', bankId).order('order_index')
-      if (!data || data.length === 0) { alert('No questions in this bank.'); router.push('/dashboard'); return }
-      setAllQuestions(data as Question[])
+      const data = await fetchBankQuestions(bankId)
+      if (data.length === 0) { alert('No questions in this bank.'); router.push('/dashboard'); return }
+      setAllQuestions(data)
       setLoading(false)
     }
     load()

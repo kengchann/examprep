@@ -7,24 +7,18 @@ import { fetchMistakeQuestions } from '@/lib/mistakes'
 import Link from 'next/link'
 import { computeWeakTopics, buildWeakDeck, type TopicStat } from '@/lib/weakAreas'
 import { setDeck } from '@/lib/deck'
+import { fetchRecentAttempts } from '@/lib/attemptsCache'
 import BottomNav from '@/components/BottomNav'
-import type { Question, AttemptResult } from '@/lib/types'
+import type { Question } from '@/lib/types'
 
 // Build the "wrong answers" deck: every question whose MOST RECENT attempt was
 // wrong. Questions you've since gotten right drop off automatically.
 async function buildWrongDeck(): Promise<Question[]> {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return []
-  const { data } = await supabase
-    .from('attempts')
-    .select('details, created_at')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
+  const data = await fetchRecentAttempts()
 
   const seen = new Set<string>()
   const deck: Question[] = []
-  for (const att of (data ?? []) as { details: AttemptResult[] | null }[]) {
+  for (const att of data) {
     for (const r of att.details ?? []) {
       if (seen.has(r.questionId)) continue   // only the most recent outcome counts
       seen.add(r.questionId)

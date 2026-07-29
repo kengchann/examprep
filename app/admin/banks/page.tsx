@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import BottomNav from '@/components/BottomNav'
 import type { QuestionBank } from '@/lib/types'
 import { classifyService } from '@/lib/services'
+import { fetchBankQuestionCounts } from '@/lib/bankCounts'
 
 const BACKUP_VERSION = 1
 
@@ -35,11 +36,7 @@ export default function BanksPage() {
     if (profile?.role !== 'admin' && profile?.role !== 'superadmin') { router.replace('/dashboard'); return }
     const { data } = await supabase.from('question_banks').select('*').order('created_at', { ascending: false })
     // Use the REAL question counts (the stored question_count column can drift).
-    const { data: counts } = await supabase.from('questions').select('bank_id')
-    const countMap: Record<string, number> = {}
-    for (const row of counts ?? []) {
-      countMap[row.bank_id] = (countMap[row.bank_id] ?? 0) + 1
-    }
+    const countMap = await fetchBankQuestionCounts((data || []).map(b => b.id))
     setBanks((data || []).map(b => ({ ...b, question_count: countMap[b.id] ?? 0 })))
     setLoading(false)
   }

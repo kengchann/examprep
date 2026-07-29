@@ -10,6 +10,7 @@ import { setDeck } from '@/lib/deck'
 import { buildSprintDeck, computeWeakTopics } from '@/lib/weakAreas'
 import { getSprintStatus, SPRINT_BANK_NAME, SPRINT_SIZE } from '@/lib/sprint'
 import { computeDashStats, type DashStats } from '@/lib/gamification'
+import { fetchBankQuestionCounts } from '@/lib/bankCounts'
 import type { QuestionBank, ExamMode } from '@/lib/types'
 import {
   LayoutDashboard, GraduationCap, Sparkles, History as HistoryIcon, BarChart3, Settings as SettingsIcon,
@@ -151,15 +152,13 @@ export default function ModernDashboard() {
       setUserName(user.user_metadata?.full_name?.split(' ')[0] || 'there')
       supabase.rpc('touch_last_active')
 
-      const [banksRes, countsRes, s, sp, topics] = await Promise.all([
+      const [banksRes, s, sp, topics] = await Promise.all([
         supabase.from('question_banks').select('*').order('created_at', { ascending: false }),
-        supabase.from('questions').select('bank_id'),
         computeDashStats(),
         getSprintStatus().catch(() => ({ streak: 0, doneToday: false })),
         computeWeakTopics().catch(() => []),
       ])
-      const countMap: Record<string, number> = {}
-      for (const row of countsRes.data ?? []) countMap[row.bank_id] = (countMap[row.bank_id] ?? 0) + 1
+      const countMap = await fetchBankQuestionCounts((banksRes.data || []).map(b => b.id))
       setBanks((banksRes.data || []).map(b => ({ ...b, question_count: countMap[b.id] ?? 0 })))
       setStats(s)
       setSprint(sp)

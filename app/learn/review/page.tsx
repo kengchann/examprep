@@ -4,8 +4,9 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { fetchSrs } from '@/lib/srs'
 import { setDeck } from '@/lib/deck'
+import { fetchRecentAttempts } from '@/lib/attemptsCache'
 import BottomNav from '@/components/BottomNav'
-import type { Question, AttemptResult } from '@/lib/types'
+import type { Question } from '@/lib/types'
 
 const SESSION = 20
 
@@ -26,16 +27,12 @@ export default function ReviewQueuePage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/auth'); return }
-      const { data } = await supabase
-        .from('attempts')
-        .select('details, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+      const data = await fetchRecentAttempts()
 
       // Build qid -> latest Question, and most-recent outcome.
       const map = new Map<string, Question>()
       const recent = new Map<string, boolean>()
-      for (const att of (data ?? []) as { details: AttemptResult[] | null }[]) {
+      for (const att of data) {
         for (const r of att.details ?? []) {
           if (map.has(r.questionId)) continue
           map.set(r.questionId, {

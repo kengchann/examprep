@@ -18,9 +18,11 @@ export default function HistoryPage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/auth'); return }
+      // List without the heavy `details` JSON — it's only needed when the user
+      // actually opens a review, so we fetch that one attempt's details on tap.
       const { data } = await supabase
         .from('attempts')
-        .select('*')
+        .select('id, bank_id, bank_name, mode, score, correct, total, elapsed_seconds, created_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(100)
@@ -31,9 +33,12 @@ export default function HistoryPage() {
   }, [])
 
   // Open the full review of a past attempt by reusing the results screen.
-  function review(a: Attempt) {
-    if (!a.details || a.details.length === 0) return
-    sessionStorage.setItem('examprep_results', JSON.stringify(a.details))
+  // Fetch this attempt's details on demand (the list query omitted them).
+  async function review(a: Attempt) {
+    const { data } = await supabase.from('attempts').select('details').eq('id', a.id).maybeSingle()
+    const details = (data?.details as Attempt['details']) ?? null
+    if (!details || details.length === 0) return
+    sessionStorage.setItem('examprep_results', JSON.stringify(details))
     const params = new URLSearchParams({
       bankName: a.bank_name || 'Exam',
       mode: a.mode || 'practice',
@@ -77,7 +82,7 @@ export default function HistoryPage() {
 
             <div className="space-y-2 mb-4">
               {history.map((attempt) => {
-                const reviewable = !!attempt.details && attempt.details.length > 0
+                const reviewable = (attempt.total ?? 0) > 0   // attempts always save details
                 return (
                   <button key={attempt.id} onClick={() => review(attempt)} disabled={!reviewable}
                     className={`card w-full text-left ${reviewable ? 'active:scale-[0.98] transition-transform' : 'opacity-90 cursor-default'}`}>

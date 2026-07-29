@@ -1,5 +1,5 @@
 import { createClient } from './supabase'
-import type { AttemptResult } from './types'
+import { fetchRecentAttempts } from './attemptsCache'
 
 // Dashboard gamification stats — XP, level, streaks, daily counts, weekly
 // trend, achievements. Everything is DERIVED client-side from the existing
@@ -50,15 +50,7 @@ export async function computeDashStats(): Promise<DashStats | null> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  const { data } = await supabase
-    .from('attempts')
-    .select('bank_id, bank_name, score, correct, total, elapsed_seconds, created_at, details')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(300)
-
-  type Row = { bank_id: string | null; bank_name: string; score: number; correct: number; total: number; elapsed_seconds: number | null; created_at: string; details: AttemptResult[] | null }
-  const rows = (data ?? []) as Row[]
+  const rows = await fetchRecentAttempts()
 
   // --- XP: 10 per correct answer + 25 per completed attempt ---
   let xp = 0, xpToday = 0

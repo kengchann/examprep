@@ -7,6 +7,7 @@ import type { Question, QuestionBank, QuestionType } from '@/lib/types'
 import { parseQuestionCSV, CSV_TEMPLATE, type ParsedCSVRow } from '@/lib/csv'
 import { classifyTopic } from '@/lib/topics'
 import { classifyService, AWS_SERVICES, UNCLASSIFIED } from '@/lib/services'
+import { fetchBankQuestionCounts } from '@/lib/bankCounts'
 
 // Sentinel form value: keep the auto-detected service instead of forcing one.
 const SERVICE_AUTO = '__auto__'
@@ -139,13 +140,7 @@ export default function QuestionsPage() {
       if (!data) { setBanks([]); return }
 
       // Get real question counts from questions table
-      const { data: counts } = await supabase
-        .from('questions')
-        .select('bank_id')
-      const countMap: Record<string, number> = {}
-      for (const row of counts ?? []) {
-        countMap[row.bank_id] = (countMap[row.bank_id] ?? 0) + 1
-      }
+      const countMap = await fetchBankQuestionCounts(data.map(b => b.id))
       const banksWithCount = data.map(b => ({ ...b, question_count: countMap[b.id] ?? 0 }))
       setBanks(banksWithCount as QuestionBank[])
       if (data.length > 0) setSelectedBank(data[0].id)

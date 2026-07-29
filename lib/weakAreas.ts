@@ -1,5 +1,6 @@
 import { createClient } from './supabase'
 import { fetchSrs } from './srs'
+import { fetchRecentAttempts } from './attemptsCache'
 import type { Question, AttemptResult } from './types'
 
 // Adaptive "weak areas" engine. Everything is derived from data we already
@@ -29,23 +30,15 @@ type History = {
 }
 
 async function gatherHistory(): Promise<History> {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { topics: [], wrongIds: new Set(), seenIds: new Set() }
-
-  const { data } = await supabase
-    .from('attempts')
-    .select('details, created_at')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(MAX_ATTEMPTS)
+  // Shared cached fetch; take the most recent MAX_ATTEMPTS for the decay math.
+  const data = (await fetchRecentAttempts()).slice(0, MAX_ATTEMPTS)
 
   type Agg = { wCorrect: number; wTotal: number; ids: Set<string> }
   const agg = new Map<string, Agg>()
   const seenIds = new Set<string>()
   const outcome = new Map<string, boolean>()   // qid -> most recent correctness
 
-  ;(data ?? []).forEach((att: { details: AttemptResult[] | null }, i: number) => {
+  data.forEach((att: { details: AttemptResult[] | null }, i: number) => {
     const w = Math.pow(DECAY, i)               // newer attempts weigh more
     for (const r of att.details ?? []) {
       const t = r.topic || 'General'

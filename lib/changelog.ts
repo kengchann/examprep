@@ -1,10 +1,19 @@
 // Bump alongside new changelog entries below.
-export const APP_VERSION = '1.18.0'
+export const APP_VERSION = '1.18.1'
 
 // Maintained by hand — add a new entry whenever a feature ships. Newest first.
 export type ChangeEntry = { date: string; title: string; items: string[] }
 
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    date: '2026-07-16 (3)',
+    title: 'Faster loads, much less data usage',
+    items: [
+      'Dashboards and Study/Review screens no longer re-download your full attempt history every time — it is fetched once and reused, and refreshed the moment you finish an exam.',
+      'Starting an exam reuses the question bank already loaded this session instead of downloading all questions again.',
+      'Bank question counts use lightweight count queries instead of scanning every row. Overall this sharply cuts Supabase data (egress) usage with no change to what you see.',
+    ],
+  },
   {
     date: '2026-07-16 (2)',
     title: 'Multi-answer-only exams',

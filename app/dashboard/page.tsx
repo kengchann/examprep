@@ -8,6 +8,7 @@ import { useUserRole } from '@/lib/useUserRole'
 import { useSettings } from '@/lib/settings'
 import { fetchLatestSession, writeSession, clearSession, clearCloudSession } from '@/lib/session'
 import { setDeck } from '@/lib/deck'
+import { fetchBankQuestionCounts } from '@/lib/bankCounts'
 import { buildSprintDeck } from '@/lib/weakAreas'
 import { getSprintStatus, SPRINT_BANK_NAME, SPRINT_SIZE } from '@/lib/sprint'
 import { useDesign } from '@/lib/design'
@@ -121,11 +122,7 @@ function ClassicDashboard() {
         .select('*').order('created_at', { ascending: false })
       // Use the REAL number of questions in each bank, not the stored
       // question_count column (which can drift out of sync after bulk imports).
-      const { data: counts } = await supabase.from('questions').select('bank_id')
-      const countMap: Record<string, number> = {}
-      for (const row of counts ?? []) {
-        countMap[row.bank_id] = (countMap[row.bank_id] ?? 0) + 1
-      }
+      const countMap = await fetchBankQuestionCounts((data || []).map(b => b.id))
       const banksWithCount = (data || []).map(b => ({ ...b, question_count: countMap[b.id] ?? 0 }))
       setBanks(banksWithCount)
       setLoading(false)
